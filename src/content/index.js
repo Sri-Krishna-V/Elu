@@ -3,6 +3,7 @@ import { simplificationLevelsConfig } from '../common/config.js';
 import { logger } from '../common/logger.js';
 import { applyBionicReading, removeBionicReading } from './bionic.js';
 import { handleTTSAction } from './tts.js';
+import { initGlossary } from './glossary.js';
 import './content.css';
 
 let simplificationSession = null;
@@ -865,4 +866,7 @@ document.addEventListener('DOMContentLoaded', () => {
             result.wordSpacing || 0
         );
     });
+    
+    // Initialize Smart Glossary
+    initGlossary();
 });
