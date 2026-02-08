@@ -2,7 +2,7 @@ import { marked } from 'marked';
 import { simplificationLevelsConfig } from '../common/config.js';
 import { logger } from '../common/logger.js';
 import { applyBionicReading, removeBionicReading } from './bionic.js';
-import { handleTTSAction } from './tts.js';
+import { handleTTSAction, getTTSState } from './tts.js';
 import { initGlossary } from './glossary.js';
 import './content.css';
 
@@ -628,6 +628,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             case "tts-stop":
                 handleTTSAction(request.action);
                 sendResponse({ success: true });
+                break;
+            
+            case "getTTSState":
+                sendResponse({ state: getTTSState() });
                 break;
 
             case "toggleBionic":

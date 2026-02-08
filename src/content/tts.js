@@ -135,3 +135,9 @@ function stopReading() {
         // Extensions context might be invalid if reloaded
     }
 }
+
+export function getTTSState() {
+    if (isPaused) return 'paused';
+    if (isPlaying) return 'playing';
+    return 'stopped';
+}
