@@ -1,5 +1,5 @@
 // Common English words list - just most frequent 1000 words for performance
-const commonEnglishWords = new Set([
+export const commonEnglishWords = new Set([
     "the","be","to","of","and","a","in","that","have","i","it","for","not","on","with","he","as","you","do","at","this",
     "but","his","by","from","they","we","say","her","she","or","an","will","my","one","all","would","there","their","what",
     "so","up","out","if","about","who","get","which","go","me","when","make","can","like","time","no","just","him","know",

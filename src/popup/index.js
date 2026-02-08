@@ -36,6 +36,10 @@ function initializePopup() {
     chrome.storage.sync.get(['fontEnabled'], function(result) {
         document.getElementById('fontToggle').checked = result.fontEnabled || false;
     });
+    
+    chrome.storage.sync.get(['focusMode'], function(result) {
+        document.getElementById('focusModeToggle').checked = result.focusMode || false;
+    });
 }
 
 // Get references to the button and its elements
@@ -281,6 +285,23 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     });
+
+    // Focus Mode (Bionic) Toggle
+    const focusModeToggle = document.getElementById('focusModeToggle');
+    if (focusModeToggle) {
+        focusModeToggle.addEventListener('change', function(e) {
+            const enabled = e.target.checked;
+            chrome.storage.sync.set({ focusMode: enabled });
+            chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+                if (tabs[0]) {
+                    chrome.tabs.sendMessage(tabs[0].id, {
+                        action: "toggleBionic",
+                        enabled: enabled
+                    });
+                }
+            });
+        });
+    }
 
     // Spacing adjustment handlers
     function debounce(func, wait) {

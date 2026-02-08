@@ -46,9 +46,11 @@ Before installing Elu, please ensure your system meets the following requirement
 ### Step 2: Install Elu Extension
 
 1. Clone the repository:
+
    ```bash
    git clone https://github.com/tanhanwei/elu.git
    ```
+
 2. Open Chrome Dev/Canary
 3. Navigate to `chrome://extensions/`
 4. Enable "Developer mode" (toggle in top right)
@@ -59,6 +61,7 @@ Before installing Elu, please ensure your system meets the following requirement
 ## ⚙️ Features in Detail
 
 ### Text Simplification
+
 - Three simplification levels (Low, Mid, High)
 - Optimization options:
   - General Reading Support
@@ -66,6 +69,7 @@ Before installing Elu, please ensure your system meets the following requirement
   - Reading Processing Support
 
 ### Display Customization
+
 - OpenDyslexic font toggle
 - Multiple color themes:
   - Default
@@ -81,6 +85,7 @@ Before installing Elu, please ensure your system meets the following requirement
 ## 💡 How It Works
 
 Elu uses Chrome's built-in Gemini Nano AI to process and simplify text content while maintaining meaning and context. The extension:
+
 1. Analyzes the current webpage content
 2. Applies the selected simplification level
 3. Optimizes the text based on your chosen reading support option
@@ -94,7 +99,6 @@ Elu uses Chrome's built-in Gemini Nano AI to process and simplify text content w
 - No tracking or data collection
 - Complete privacy protection for all users
 
-
 ## 📝 License
 
 MIT License
@@ -102,6 +106,7 @@ MIT License
 ## ⚠️ Troubleshooting
 
 If you encounter any issues:
+
 1. Verify you have sufficient disk space (>22 GB)
 2. Confirm Chrome version is compatible
 3. Check that all flags are properly enabled

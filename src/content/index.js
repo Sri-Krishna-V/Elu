@@ -1,10 +1,12 @@
 import { marked } from 'marked';
 import { simplificationLevelsConfig } from '../common/config.js';
 import { logger } from '../common/logger.js';
+import { applyBionicReading, removeBionicReading } from './bionic.js';
 import './content.css';
 
-let promptSession = null;
+let simplificationSession = null;
 let systemPrompt = null; // Store systemPrompt globally
+let loadedSystemPrompts = null; // Store all loaded prompts globally
 
 // Theme definitions
 const themes = {
@@ -89,14 +91,14 @@ async function initAICapabilities() {
     try {
         if (!self.ai || !self.ai.languageModel) {
             console.error('AI API is not available');
-            return { summarizer: null, promptSession: null }; 
+            return { summarizer: null, simplificationSession: null }; 
         }
 
         // Load system prompts
-        const systemPrompts = await loadSystemPrompts();
-        console.log('Loaded systemPrompts:', systemPrompts);
+        loadedSystemPrompts = await loadSystemPrompts();
+        console.log('Loaded systemPrompts:', loadedSystemPrompts);
 
-        if (!systemPrompts) {
+        if (!loadedSystemPrompts) {
             throw new Error('Failed to load system prompts.');
         }
 
@@ -113,7 +115,7 @@ async function initAICapabilities() {
         });
 
         // Select the appropriate system prompt and store globally
-        systemPrompt = systemPrompts[optimizeFor][readingLevel];
+        systemPrompt = loadedSystemPrompts[optimizeFor][readingLevel];
         console.log('Selected systemPrompt:', systemPrompt);
 
         if (!systemPrompt) {
@@ -122,14 +124,14 @@ async function initAICapabilities() {
 
         const { defaultTemperature, defaultTopK } = await self.ai.languageModel.capabilities();
         // Update existing promptSession without redeclaring
-        promptSession = await self.ai.languageModel.create({
+        simplificationSession = await self.ai.languageModel.create({
             temperature: defaultTemperature,
             topK: defaultTopK,
             systemPrompt: systemPrompt
         });
         console.log('Language Model initialized successfully');
 
-        return { promptSession };
+        return { simplificationSession };
     } catch (error) {
         console.error('Error initializing AI capabilities:', error);
         throw error;
@@ -145,7 +147,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             case "simplify":
                 try {
                     await ensureInitialized();
-                    if (!promptSession) {
+                    if (!simplificationSession) {
                         console.error('Prompt API not available - cannot simplify text');
                         sendResponse({success: false, error: 'Prompt API not available'});
                         return;
@@ -153,7 +155,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
                 console.log('Finding main content element...');
                 
-                console.log('Prompt API status:', promptSession ? 'initialized' : 'not initialized');
+                console.log('Prompt API status:', simplificationSession ? 'initialized' : 'not initialized');
                 
                 // Try to find the main content using various selectors, including Straits Times specific ones
                 const mainContent = document.querySelector([
@@ -374,7 +376,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                                 // Log the prompts before sending
                                 logPrompt(chunkText);
 
-                                const stream = await promptSession.promptStreaming(chunkText);
+                                const stream = await simplificationSession.promptStreaming(chunkText);
                                 for await (const chunk of stream) {
                                     simplifiedText = chunk.trim();
                                 }
@@ -617,6 +619,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             case "getHoverState":
                 sendResponse({ hoverEnabled: hoverEnabled });
                 break;
+
+            case "toggleBionic":
+                console.log("Toggling Bionic Reading...", request.enabled);
+                if (request.enabled) {
+                    applyBionicReading();
+                } else {
+                    removeBionicReading();
+                }
+                sendResponse({ success: true });
+                break;
         }
         sendResponse({success: true});
     })();
@@ -770,7 +782,7 @@ function ensureInitialized() {
         console.log('Content script loaded - starting initialization');
         initializationPromise = initAICapabilities().then(() => {
             console.log('Content script setup complete with capabilities:', {
-                promptSessionAvailable: !!promptSession
+                promptSessionAvailable: !!simplificationSession
             });
         }).catch(error => {
             console.error('Failed to initialize AI capabilities:', error);
