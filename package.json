@@ -1,0 +1,29 @@
+{
+  "name": "elu",
+  "version": "1.0.0",
+  "description": "<img src=\"/api/placeholder/120/120\" alt=\"Elu Logo\" />",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Sri-Krishna-V/elu.git"
+  },
+  "keywords": [],
+  "author": "Sri Krishna V",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Sri-Krishna-V/elu/issues"
+  },
+  "homepage": "https://github.com/Sri-Krishna-V/elu#readme",
+  "devDependencies": {
+    "vite": "^7.3.1"
+  },
+  "dependencies": {
+    "marked": "^17.0.1"
+  }
+}
