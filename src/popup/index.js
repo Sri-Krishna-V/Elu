@@ -303,6 +303,62 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // TTS Controls
+    const ttsPlay = document.getElementById('ttsPlay');
+    const ttsPause = document.getElementById('ttsPause');
+    const ttsResume = document.getElementById('ttsResume');
+    const ttsStop = document.getElementById('ttsStop');
+
+    function updateTTSControls(state) {
+        if (!ttsPlay) return;
+        ttsPlay.style.display = state === 'stopped' ? 'inline-block' : 'none';
+        ttsPause.style.display = state === 'playing' ? 'inline-block' : 'none';
+        ttsResume.style.display = state === 'paused' ? 'inline-block' : 'none';
+    }
+
+    if (ttsPlay) {
+        ttsPlay.addEventListener('click', () => {
+            chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
+                 if(tabs[0]) chrome.tabs.sendMessage(tabs[0].id, {action: 'tts-play'});
+                 updateTTSControls('playing');
+            });
+        });
+    }
+
+    if (ttsPause) {
+        ttsPause.addEventListener('click', () => {
+            chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
+                 if(tabs[0]) chrome.tabs.sendMessage(tabs[0].id, {action: 'tts-pause'});
+                 updateTTSControls('paused');
+            });
+        });
+    }
+
+    if (ttsResume) {
+        ttsResume.addEventListener('click', () => {
+            chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
+                 if(tabs[0]) chrome.tabs.sendMessage(tabs[0].id, {action: 'tts-resume'});
+                 updateTTSControls('playing');
+            });
+        });
+    }
+
+    if (ttsStop) {
+        ttsStop.addEventListener('click', () => {
+            chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
+                 if(tabs[0]) chrome.tabs.sendMessage(tabs[0].id, {action: 'tts-stop'});
+                 updateTTSControls('stopped');
+            });
+        });
+    }
+    
+    // Listen for TTS state updates from content script
+    chrome.runtime.onMessage.addListener((message) => {
+        if (message.action === 'tts-state-change') {
+            updateTTSControls(message.state);
+        }
+    });
+
     // Spacing adjustment handlers
     function debounce(func, wait) {
         let timeout;

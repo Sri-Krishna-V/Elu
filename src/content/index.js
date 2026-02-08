@@ -2,6 +2,7 @@ import { marked } from 'marked';
 import { simplificationLevelsConfig } from '../common/config.js';
 import { logger } from '../common/logger.js';
 import { applyBionicReading, removeBionicReading } from './bionic.js';
+import { handleTTSAction } from './tts.js';
 import './content.css';
 
 let simplificationSession = null;
@@ -618,6 +619,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
             case "getHoverState":
                 sendResponse({ hoverEnabled: hoverEnabled });
+                break;
+
+            case "tts-play":
+            case "tts-pause":
+            case "tts-resume":
+            case "tts-stop":
+                handleTTSAction(request.action);
+                sendResponse({ success: true });
                 break;
 
             case "toggleBionic":
