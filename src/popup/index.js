@@ -2,44 +2,134 @@ import { simplificationLevelsConfig } from '../common/config.js';
 
 function initializePopup() {
     // Restore selected simplification level and font settings
-    chrome.storage.sync.get(['simplificationLevel', 'optimizeFor', 'fontEnabled'], function(result) {
+    chrome.storage.sync.get(['simplificationLevel', 'optimizeFor', 'fontEnabled'], function (result) {
         const level = result.simplificationLevel || '3'; // Default to '3' for "Mid"
         const button = document.querySelector(`.simplification-button[data-level="${level}"]`);
         if (button) {
             document.querySelectorAll('.simplification-button').forEach(btn => btn.classList.remove('selected'));
             button.classList.add('selected');
         }
-        
+
         // Restore optimize for selection
         document.getElementById('optimizeSelector').value = result.optimizeFor || 'general';
-        
+
         // Restore font toggle state
         document.getElementById('fontToggle').checked = result.fontEnabled || false;
     });
 
 
     // Restore theme, toggle and slider states
-    chrome.storage.sync.get(['selectedTheme'], function(result) {
+    chrome.storage.sync.get(['selectedTheme'], function (result) {
         document.getElementById('themeSelector').value = result.selectedTheme || 'default';
     });
-    chrome.storage.sync.get(['lineSpacing', 'letterSpacing', 'wordSpacing'], function(result) {
+    chrome.storage.sync.get(['lineSpacing', 'letterSpacing', 'wordSpacing'], function (result) {
         document.getElementById('lineSpacing').value = result.lineSpacing || 1.5;
         document.getElementById('lineSpacingValue').textContent = result.lineSpacing || 1.5;
-        
+
         document.getElementById('letterSpacing').value = result.letterSpacing || 0;
         document.getElementById('letterSpacingValue').textContent = (result.letterSpacing || 0) + 'px';
-        
+
         document.getElementById('wordSpacing').value = result.wordSpacing || 0;
         document.getElementById('wordSpacingValue').textContent = (result.wordSpacing || 0) + 'px';
     });
-    
-    chrome.storage.sync.get(['fontEnabled'], function(result) {
+
+    chrome.storage.sync.get(['fontEnabled'], function (result) {
         document.getElementById('fontToggle').checked = result.fontEnabled || false;
     });
-    
-    chrome.storage.sync.get(['focusMode'], function(result) {
+
+    chrome.storage.sync.get(['focusMode'], function (result) {
         document.getElementById('focusModeToggle').checked = result.focusMode || false;
     });
+
+    // Chunk Mode button handler
+    const chunkModeBtn = document.getElementById('chunkModeBtn');
+    if (chunkModeBtn) {
+        chunkModeBtn.addEventListener('click', function () {
+            chunkModeBtn.disabled = true;
+            chunkModeBtn.querySelector('span').textContent = 'Loading...';
+
+            chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+                if (tabs[0] && /^https?:/.test(tabs[0].url)) {
+                    chrome.tabs.sendMessage(tabs[0].id, { action: 'chunk-start' }, function (response) {
+                        if (chrome.runtime.lastError) {
+                            console.error('Could not start chunk mode:', chrome.runtime.lastError.message);
+                            chunkModeBtn.querySelector('span').textContent = 'Error!';
+                        } else if (response && response.success) {
+                            chunkModeBtn.querySelector('span').textContent = 'Active!';
+                            // Close popup after activating
+                            setTimeout(() => window.close(), 500);
+                        } else {
+                            chunkModeBtn.querySelector('span').textContent = 'No Content';
+                        }
+
+                        setTimeout(function () {
+                            chunkModeBtn.disabled = false;
+                            chunkModeBtn.querySelector('span').textContent = 'Chunk Mode';
+                        }, 2000);
+                    });
+                } else {
+                    console.warn('Active tab is not a valid web page.');
+                    chunkModeBtn.querySelector('span').textContent = 'Invalid Page';
+                    setTimeout(function () {
+                        chunkModeBtn.disabled = false;
+                        chunkModeBtn.querySelector('span').textContent = 'Chunk Mode';
+                    }, 2000);
+                }
+            });
+        });
+    }
+
+    // Focus Mode button handler
+    const focusModeBtn = document.getElementById('focusModeBtn');
+    if (focusModeBtn) {
+        // Check current focus state
+        chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+            if (tabs[0] && /^https?:/.test(tabs[0].url)) {
+                chrome.tabs.sendMessage(tabs[0].id, { action: 'focus-get-state' }, function (response) {
+                    if (!chrome.runtime.lastError && response && response.isActive) {
+                        focusModeBtn.classList.add('active');
+                        focusModeBtn.querySelector('span').textContent = 'Exit Focus';
+                    }
+                });
+            }
+        });
+
+        focusModeBtn.addEventListener('click', function () {
+            focusModeBtn.disabled = true;
+
+            chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+                if (tabs[0] && /^https?:/.test(tabs[0].url)) {
+                    chrome.tabs.sendMessage(tabs[0].id, { action: 'focus-toggle' }, function (response) {
+                        if (chrome.runtime.lastError) {
+                            console.error('Could not toggle focus mode:', chrome.runtime.lastError.message);
+                            focusModeBtn.querySelector('span').textContent = 'Error!';
+                        } else if (response && response.success) {
+                            if (response.isActive) {
+                                focusModeBtn.classList.add('active');
+                                focusModeBtn.querySelector('span').textContent = 'Exit Focus';
+                            } else {
+                                focusModeBtn.classList.remove('active');
+                                focusModeBtn.querySelector('span').textContent = 'Focus Mode';
+                            }
+                            // Close popup after toggling
+                            setTimeout(() => window.close(), 500);
+                        }
+
+                        setTimeout(function () {
+                            focusModeBtn.disabled = false;
+                        }, 500);
+                    });
+                } else {
+                    console.warn('Active tab is not a valid web page.');
+                    focusModeBtn.querySelector('span').textContent = 'Invalid Page';
+                    setTimeout(function () {
+                        focusModeBtn.disabled = false;
+                        focusModeBtn.querySelector('span').textContent = 'Focus Mode';
+                    }, 2000);
+                }
+            });
+        });
+    }
 }
 
 // Get references to the button and its elements
@@ -48,7 +138,7 @@ const simplifyButtonText = document.getElementById('simplifyButtonText');
 const loader = document.getElementById('loader');
 
 // Button click handler
-simplifyButton.addEventListener('click', function() {
+simplifyButton.addEventListener('click', function () {
     // Disable the button
     simplifyButton.disabled = true;
 
@@ -56,9 +146,9 @@ simplifyButton.addEventListener('click', function() {
     simplifyButtonText.textContent = 'Simplifying Text...';
     loader.style.display = 'inline-block';
 
-    chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+    chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
         if (tabs[0] && /^https?:/.test(tabs[0].url)) {
-            chrome.tabs.sendMessage(tabs[0].id, {action: "simplify"}, function(response) {
+            chrome.tabs.sendMessage(tabs[0].id, { action: "simplify" }, function (response) {
                 if (chrome.runtime.lastError) {
                     console.error("Could not send simplify message:", chrome.runtime.lastError.message);
 
@@ -67,7 +157,7 @@ simplifyButton.addEventListener('click', function() {
                     simplifyButtonText.textContent = 'Simplify Text';
                     loader.style.display = 'none';
                 } else {
-                    if(response && response.success) {
+                    if (response && response.success) {
                         // Simplification succeeded
                         simplifyButtonText.textContent = 'Done!';
                     } else {
@@ -80,7 +170,7 @@ simplifyButton.addEventListener('click', function() {
                     loader.style.display = 'none';
 
                     // After a delay, reset the button
-                    setTimeout(function() {
+                    setTimeout(function () {
                         simplifyButton.disabled = false;
                         simplifyButtonText.textContent = 'Simplify Text';
                     }, 2000);
@@ -104,16 +194,16 @@ function generateSimplificationButtons() {
         console.error('Simplification button row element not found');
         return;
     }
-    
+
     buttonRow.innerHTML = ''; // Clear existing buttons
 
     // Get configuration
     const levels = simplificationLevelsConfig.levels;
-    const labels = levels === 3 ? 
-        ['Low', 'Mid', 'High'] : 
+    const labels = levels === 3 ?
+        ['Low', 'Mid', 'High'] :
         ['Very Low', 'Low', 'Mid', 'High', 'Very High'];
-    const dataLevels = levels === 3 ? 
-        ['1', '3', '5'] : 
+    const dataLevels = levels === 3 ?
+        ['1', '3', '5'] :
         ['1', '2', '3', '4', '5'];
 
     labels.forEach((label, index) => {
@@ -126,7 +216,7 @@ function generateSimplificationButtons() {
             button.classList.add('selected');
         }
 
-        button.addEventListener('click', function() {
+        button.addEventListener('click', function () {
             document.querySelectorAll('.simplification-button')
                 .forEach(btn => btn.classList.remove('selected'));
             this.classList.add('selected');
@@ -137,7 +227,7 @@ function generateSimplificationButtons() {
     });
 }
 
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     generateSimplificationButtons();
     document.getElementById('mainContent').style.display = 'block';
     initializePopup();
@@ -145,22 +235,22 @@ document.addEventListener('DOMContentLoaded', function() {
     // Add help icon click handler
     const helpIcon = document.querySelector('.help-icon');
     const simplificationGuide = document.getElementById('simplificationGuide');
-    
-    helpIcon.addEventListener('click', function() {
+
+    helpIcon.addEventListener('click', function () {
         simplificationGuide.classList.toggle('expanded');
         const expanded = simplificationGuide.classList.contains('expanded');
         helpIcon.setAttribute('aria-expanded', expanded.toString());
     });
 
     // Reset to Defaults button handler
-    document.getElementById('resetDefaults').addEventListener('click', function() {
+    document.getElementById('resetDefaults').addEventListener('click', function () {
         chrome.storage.sync.set({
             fontEnabled: false,
             selectedTheme: 'default',
             lineSpacing: 1.5,
             letterSpacing: 0,
             wordSpacing: 0
-        }, function() {
+        }, function () {
             // Update the UI elements
             document.getElementById('fontToggle').checked = false;
             document.getElementById('themeSelector').value = 'default';
@@ -175,7 +265,7 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('wordSpacingValue').textContent = '0px';
 
             // Apply defaults to the current tab
-            chrome.tabs.query({ active: true, currentWindow: true }, function(tabs) {
+            chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
                 if (tabs[0]) {
                     // Reset font
                     chrome.tabs.sendMessage(tabs[0].id, {
@@ -215,26 +305,26 @@ document.addEventListener('DOMContentLoaded', function() {
     const mainContent = document.getElementById('mainContent');
     const settingsPage = document.getElementById('settingsPage');
 
-    settingsButton.addEventListener('click', function() {
+    settingsButton.addEventListener('click', function () {
         mainContent.style.display = 'none';
         settingsPage.style.display = 'block';
     });
 
-    backButton.addEventListener('click', function() {
+    backButton.addEventListener('click', function () {
         settingsPage.style.display = 'none';
         mainContent.style.display = 'block';
     });
 
     // Handle optimize for dropdown changes and help icon
-    document.getElementById('optimizeSelector').addEventListener('change', function(e) {
+    document.getElementById('optimizeSelector').addEventListener('change', function (e) {
         chrome.storage.sync.set({ optimizeFor: e.target.value });
     });
 
     const helpIconOptimize = document.getElementById('helpIconOptimize');
     const optimizeGuide = document.getElementById('optimizeGuide');
-    
+
     if (helpIconOptimize && optimizeGuide) {
-        helpIconOptimize.addEventListener('click', function() {
+        helpIconOptimize.addEventListener('click', function () {
             optimizeGuide.classList.toggle('expanded');
             const expanded = optimizeGuide.classList.contains('expanded');
             helpIconOptimize.setAttribute('aria-expanded', expanded.toString());
@@ -245,11 +335,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // OpenDyslexic font toggle handler
     const fontToggle = document.getElementById('fontToggle');
-    
+
     // Request current font state when popup opens
-    chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+    chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
         if (tabs[0] && /^https?:/.test(tabs[0].url)) {
-            chrome.tabs.sendMessage(tabs[0].id, { action: 'getFontState' }, function(response) {
+            chrome.tabs.sendMessage(tabs[0].id, { action: 'getFontState' }, function (response) {
                 if (chrome.runtime.lastError) {
                     console.error("Could not get font state:", chrome.runtime.lastError.message);
                     fontToggle.checked = false; // Default to unchecked
@@ -263,19 +353,19 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    fontToggle.addEventListener('change', function(e) {
+    fontToggle.addEventListener('change', function (e) {
         const enabled = e.target.checked;
-        
+
         // Save preference
         chrome.storage.sync.set({ fontEnabled: enabled });
-        
+
         // Apply to current tab
-        chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+        chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
             if (tabs[0] && /^https?:/.test(tabs[0].url)) {
                 chrome.tabs.sendMessage(tabs[0].id, {
                     action: 'toggleFont',
                     enabled: enabled
-                }, function(response) {
+                }, function (response) {
                     if (chrome.runtime.lastError) {
                         console.error('Could not toggle font:', chrome.runtime.lastError.message);
                     }
@@ -289,10 +379,10 @@ document.addEventListener('DOMContentLoaded', function() {
     // Focus Mode (Bionic) Toggle
     const focusModeToggle = document.getElementById('focusModeToggle');
     if (focusModeToggle) {
-        focusModeToggle.addEventListener('change', function(e) {
+        focusModeToggle.addEventListener('change', function (e) {
             const enabled = e.target.checked;
             chrome.storage.sync.set({ focusMode: enabled });
-            chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+            chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
                 if (tabs[0]) {
                     chrome.tabs.sendMessage(tabs[0].id, {
                         action: "toggleBionic",
@@ -301,11 +391,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
         });
-    }    
+    }
     // Check TTS State
-    chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+    chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
         if (tabs[0]) {
-            chrome.tabs.sendMessage(tabs[0].id, { action: "getTTSState" }, function(response) {
+            chrome.tabs.sendMessage(tabs[0].id, { action: "getTTSState" }, function (response) {
                 if (!chrome.runtime.lastError && response && response.state) {
                     updateTTSControls(response.state);
                 }
@@ -327,40 +417,40 @@ document.addEventListener('DOMContentLoaded', function() {
 
     if (ttsPlay) {
         ttsPlay.addEventListener('click', () => {
-            chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
-                 if(tabs[0]) chrome.tabs.sendMessage(tabs[0].id, {action: 'tts-play'});
-                 updateTTSControls('playing');
+            chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+                if (tabs[0]) chrome.tabs.sendMessage(tabs[0].id, { action: 'tts-play' });
+                updateTTSControls('playing');
             });
         });
     }
 
     if (ttsPause) {
         ttsPause.addEventListener('click', () => {
-            chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
-                 if(tabs[0]) chrome.tabs.sendMessage(tabs[0].id, {action: 'tts-pause'});
-                 updateTTSControls('paused');
+            chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+                if (tabs[0]) chrome.tabs.sendMessage(tabs[0].id, { action: 'tts-pause' });
+                updateTTSControls('paused');
             });
         });
     }
 
     if (ttsResume) {
         ttsResume.addEventListener('click', () => {
-            chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
-                 if(tabs[0]) chrome.tabs.sendMessage(tabs[0].id, {action: 'tts-resume'});
-                 updateTTSControls('playing');
+            chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+                if (tabs[0]) chrome.tabs.sendMessage(tabs[0].id, { action: 'tts-resume' });
+                updateTTSControls('playing');
             });
         });
     }
 
     if (ttsStop) {
         ttsStop.addEventListener('click', () => {
-            chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
-                 if(tabs[0]) chrome.tabs.sendMessage(tabs[0].id, {action: 'tts-stop'});
-                 updateTTSControls('stopped');
+            chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+                if (tabs[0]) chrome.tabs.sendMessage(tabs[0].id, { action: 'tts-stop' });
+                updateTTSControls('stopped');
             });
         });
     }
-    
+
     // Listen for TTS state updates from content script
     chrome.runtime.onMessage.addListener((message) => {
         if (message.action === 'tts-state-change') {
@@ -371,7 +461,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Spacing adjustment handlers
     function debounce(func, wait) {
         let timeout;
-        return function(...args) {
+        return function (...args) {
             clearTimeout(timeout);
             timeout = setTimeout(() => func.apply(this, args), wait);
         };
@@ -382,14 +472,14 @@ document.addEventListener('DOMContentLoaded', function() {
         const letterSpacing = document.getElementById('letterSpacing').value;
         const wordSpacing = document.getElementById('wordSpacing').value;
 
-        chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+        chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
             if (tabs[0] && /^https?:/.test(tabs[0].url)) {
                 chrome.tabs.sendMessage(tabs[0].id, {
                     action: 'adjustSpacing',
                     lineSpacing: lineSpacing,
                     letterSpacing: letterSpacing,
                     wordSpacing: wordSpacing
-                }, function(response) {
+                }, function (response) {
                     if (chrome.runtime.lastError) {
                         console.error('Could not adjust spacing:', chrome.runtime.lastError.message);
                     }
@@ -405,14 +495,14 @@ document.addEventListener('DOMContentLoaded', function() {
     // Debounce function implementation
     function debounce(func, wait) {
         let timeout;
-        return function(...args) {
+        return function (...args) {
             clearTimeout(timeout);
             timeout = setTimeout(() => func.apply(this, args), wait);
         };
     }
 
     // Define a debounced function to save settings and apply spacing
-    const debouncedSaveAndApplySpacing = debounce(function() {
+    const debouncedSaveAndApplySpacing = debounce(function () {
         const lineSpacing = document.getElementById('lineSpacing').value;
         const letterSpacing = document.getElementById('letterSpacing').value;
         const wordSpacing = document.getElementById('wordSpacing').value;
@@ -429,35 +519,35 @@ document.addEventListener('DOMContentLoaded', function() {
     }, 200);
 
     // Line Spacing Slider
-    document.getElementById('lineSpacing').addEventListener('input', function(e) {
+    document.getElementById('lineSpacing').addEventListener('input', function (e) {
         const value = e.target.value;
         document.getElementById('lineSpacingValue').textContent = value;
         debouncedSaveAndApplySpacing();
     });
 
     // Letter Spacing Slider
-    document.getElementById('letterSpacing').addEventListener('input', function(e) {
+    document.getElementById('letterSpacing').addEventListener('input', function (e) {
         const value = e.target.value;
         document.getElementById('letterSpacingValue').textContent = value + 'px';
         debouncedSaveAndApplySpacing();
     });
 
     // Word Spacing Slider
-    document.getElementById('wordSpacing').addEventListener('input', function(e) {
+    document.getElementById('wordSpacing').addEventListener('input', function (e) {
         const value = e.target.value;
         document.getElementById('wordSpacingValue').textContent = value + 'px';
         debouncedSaveAndApplySpacing();
     });
 
     // Theme Selector Handler
-    document.getElementById('themeSelector').addEventListener('change', function(e) {
+    document.getElementById('themeSelector').addEventListener('change', function (e) {
         const selectedTheme = e.target.value;
-        
+
         // Save the selected theme
         chrome.storage.sync.set({ selectedTheme: selectedTheme });
-        
+
         // Send message to content script to apply the theme
-        chrome.tabs.query({ active: true, currentWindow: true }, function(tabs) {
+        chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
             chrome.tabs.sendMessage(tabs[0].id, {
                 action: 'applyTheme',
                 theme: selectedTheme
@@ -467,14 +557,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Apply initial spacing and theme
     debouncedApplySpacing();
-    chrome.tabs.query({ active: true, currentWindow: true }, function(tabs) {
+    chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
         if (tabs[0] && /^https?:/.test(tabs[0].url)) {
-            chrome.storage.sync.get(['selectedTheme'], function(result) {
+            chrome.storage.sync.get(['selectedTheme'], function (result) {
                 const selectedTheme = result.selectedTheme || 'default';
                 chrome.tabs.sendMessage(tabs[0].id, {
                     action: 'applyTheme',
                     theme: selectedTheme
-                }, function(response) {
+                }, function (response) {
                     if (chrome.runtime.lastError) {
                         console.error('Could not apply theme:', chrome.runtime.lastError.message);
                     }
@@ -484,4 +574,4 @@ document.addEventListener('DOMContentLoaded', function() {
             console.warn("Active tab is not a valid web page. Cannot apply theme.");
         }
     });
-  });
+});

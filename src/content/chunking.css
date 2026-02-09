@@ -1,0 +1,303 @@
+/**
+ * Styles for Smart Content Chunking feature
+ */
+
+/* Container */
+.elu-chunk-container {
+    max-width: 800px;
+    margin: 2rem auto;
+    padding: 1.5rem;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    border-radius: 16px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: #e0e0e0;
+}
+
+/* Header */
+.elu-chunk-header {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Progress Bar */
+.elu-progress-bar {
+    height: 24px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    overflow: hidden;
+    position: relative;
+    margin-bottom: 1rem;
+}
+
+.elu-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #00d9ff 0%, #00ff88 100%);
+    border-radius: 12px;
+    transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 0 20px rgba(0, 217, 255, 0.4);
+}
+
+.elu-progress-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 12px;
+    font-weight: 600;
+    color: white;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+/* Navigation */
+.elu-chunk-nav {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    margin-bottom: 0.75rem;
+}
+
+.elu-chunk-indicator {
+    font-size: 14px;
+    color: #a0a0a0;
+    min-width: 120px;
+    text-align: center;
+}
+
+/* Buttons */
+.elu-chunk-btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: rgba(255, 255, 255, 0.1);
+    color: #e0e0e0;
+}
+
+.elu-chunk-btn:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.2);
+    transform: translateY(-1px);
+}
+
+.elu-chunk-btn:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.elu-chunk-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.elu-prev-btn,
+.elu-next-btn {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.elu-prev-btn:hover:not(:disabled),
+.elu-next-btn:hover:not(:disabled) {
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+}
+
+.elu-bookmark-btn {
+    font-size: 18px;
+    padding: 8px 12px;
+}
+
+.elu-complete-btn {
+    background: linear-gradient(135deg, #00d9ff 0%, #00ff88 100%);
+    color: #1a1a2e;
+    font-weight: 600;
+    padding: 12px 24px;
+}
+
+.elu-complete-btn:hover:not(:disabled) {
+    box-shadow: 0 4px 20px rgba(0, 217, 255, 0.5);
+}
+
+.elu-exit-btn {
+    background: rgba(255, 100, 100, 0.2);
+    color: #ff8080;
+}
+
+.elu-exit-btn:hover {
+    background: rgba(255, 100, 100, 0.3);
+}
+
+/* Metadata */
+.elu-chunk-meta {
+    display: flex;
+    justify-content: center;
+    gap: 1.5rem;
+    font-size: 13px;
+    color: #a0a0a0;
+}
+
+.elu-read-time {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.elu-complexity {
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+}
+
+.elu-complexity-low {
+    background: rgba(0, 255, 136, 0.2);
+    color: #00ff88;
+}
+
+.elu-complexity-medium {
+    background: rgba(255, 200, 0, 0.2);
+    color: #ffc800;
+}
+
+.elu-complexity-high {
+    background: rgba(255, 100, 100, 0.2);
+    color: #ff6464;
+}
+
+/* Content Area */
+.elu-chunk-content {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 12px;
+    padding: 2rem;
+    margin: 1.5rem 0;
+    line-height: 1.8;
+    font-size: 18px;
+    min-height: 200px;
+}
+
+.elu-chunk-content h1,
+.elu-chunk-content h2,
+.elu-chunk-content h3,
+.elu-chunk-content h4,
+.elu-chunk-content h5,
+.elu-chunk-content h6 {
+    color: #ffffff;
+    margin: 1rem 0 0.5rem 0;
+}
+
+.elu-chunk-content p {
+    margin: 0.75rem 0;
+    color: #d0d0d0;
+}
+
+.elu-chunk-content li {
+    margin: 0.5rem 0;
+    color: #d0d0d0;
+}
+
+.elu-chunk-content blockquote {
+    border-left: 3px solid #667eea;
+    padding-left: 1rem;
+    margin: 1rem 0;
+    font-style: italic;
+    color: #b0b0b0;
+}
+
+/* Footer */
+.elu-chunk-footer {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Animations */
+@keyframes elu-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+.elu-chunk-container.elu-loading .elu-chunk-content {
+    animation: elu-pulse 1.5s ease-in-out infinite;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .elu-chunk-container {
+        margin: 1rem;
+        padding: 1rem;
+    }
+    
+    .elu-chunk-nav {
+        flex-wrap: wrap;
+    }
+    
+    .elu-chunk-content {
+        padding: 1rem;
+        font-size: 16px;
+    }
+    
+    .elu-chunk-footer {
+        flex-direction: column;
+    }
+}
+
+/* Resume Reading Banner */
+.elu-resume-banner {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 12px 24px;
+    border-radius: 30px;
+    box-shadow: 0 10px 40px rgba(102, 126, 234, 0.5);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    z-index: 10000;
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+    animation: elu-slide-up 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes elu-slide-up {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+.elu-resume-banner button {
+    background: white;
+    color: #667eea;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.elu-resume-banner button:hover {
+    transform: scale(1.05);
+}
+
+.elu-resume-dismiss {
+    background: transparent !important;
+    color: white !important;
+    padding: 4px 8px !important;
+    opacity: 0.7;
+}
+
+.elu-resume-dismiss:hover {
+    opacity: 1;
+}

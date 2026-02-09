@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <title>Elu</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
@@ -8,6 +9,7 @@
   <link rel="modulepreload" crossorigin href="/assets/modulepreload-polyfill.js">
   <link rel="stylesheet" crossorigin href="/assets/popup.css">
 </head>
+
 <body>
     <div id="mainContent">
         <div class="container">
@@ -22,7 +24,7 @@
             </header>
             <div class="simplification-level">
                 <h2 class="section-title">
-                    <i class="fa-solid fa-wand-magic-sparkles text-icon"></i> 
+                    <i class="fa-solid fa-wand-magic-sparkles text-icon"></i>
                     Simplification Level
                     <i class="fa-solid fa-circle-question help-icon" aria-expanded="false"></i>
                 </h2>
@@ -41,7 +43,7 @@
                     </ul>
                 </div>
 
-                
+
             </div>
             <div class="optimization-mode">
                 <h2 class="section-title">
@@ -50,13 +52,13 @@
                     <i id="helpIconOptimize" class="fa-solid fa-circle-question help-icon" aria-expanded="false"></i>
                 </h2>
                 <div class="dropdown-container">
-                <select id="optimizeSelector">
-                    <option value="textClarity" selected>Simplify Complex Ideas</option>
-                    <option value="focusStructure">Better Visual Organization</option>
-                    <option value="wordPattern">Easier Reading Flow</option>
-                </select>
-            </div>
-            <div id="optimizeGuide" class="optimize-guide">
+                    <select id="optimizeSelector">
+                        <option value="textClarity" selected>Simplify Complex Ideas</option>
+                        <option value="focusStructure">Better Visual Organization</option>
+                        <option value="wordPattern">Easier Reading Flow</option>
+                    </select>
+                </div>
+                <div id="optimizeGuide" class="optimize-guide">
                     <ul>
                         <li>
                             <i class="fa-solid fa-lightbulb"></i>
@@ -86,7 +88,7 @@
                 <span id="simplifyButtonText">Simplify Text</span>
                 <span id="loader" class="loader" style="display: none;"></span>
             </button>
-            
+
             <div class="reading-controls" style="margin-top: 15px; display: flex; gap: 10px; justify-content: center;">
                 <button id="ttsPlay" class="icon-button" aria-label="Play" title="Read Aloud">
                     <i class="fas fa-play"></i>
@@ -102,6 +104,28 @@
                 </button>
             </div>
 
+            <!-- Smart Chunking -->
+            <div class="chunk-controls" style="margin-top: 15px;">
+                <button id="chunkModeBtn" class="chunk-mode-button">
+                    <i class="fas fa-layer-group"></i>
+                    <span>Chunk Mode</span>
+                </button>
+                <p class="helper-text" style="font-size: 11px; color: #888; margin-top: 5px; text-align: center;">
+                    Break content into digestible chunks with progress tracking
+                </p>
+            </div>
+
+            <!-- Focus Mode -->
+            <div class="focus-controls" style="margin-top: 15px;">
+                <button id="focusModeBtn" class="focus-mode-button">
+                    <i class="fas fa-eye"></i>
+                    <span>Focus Mode</span>
+                </button>
+                <p class="helper-text" style="font-size: 11px; color: #888; margin-top: 5px; text-align: center;">
+                    Dim distractions & focus on content
+                </p>
+            </div>
+
             <!-- Spacing Controls -->
         </div>
     </div>
@@ -113,12 +137,12 @@
                     <i class="fas fa-arrow-left"></i>
                 </button>
             </header>
-            
+
             <!-- Display Category -->
             <h2 class="section-title">
                 <i class="fas fa-desktop"></i> Display
             </h2>
-            
+
             <div class="toggle-container">
                 <span class="toggle-label">OpenDyslexic Font</span>
                 <label class="toggle">
@@ -169,4 +193,5 @@
         </div>
     </div>
 </body>
+
 </html>
