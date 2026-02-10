@@ -1,117 +1,142 @@
-# Elu - Making Web Content More Accessible
+# Elu - AI-Powered Accessible Reading Assistant
 
-<img src="/api/placeholder/120/120" alt="Elu Logo" />
+<div align="center">
+  <img src="public/images/icon128.png" alt="Elu Logo" width="128" height="128" />
+  <p><em>Making the web accessible for every mind.</em></p>
+</div>
 
-Elu (short for Elucidate) is a Chrome extension that makes web content more accessible for readers with different reading needs. Elu makes hard-to-read content more digestible while preserving the complete reading experience.
+Elu (short for **Elucidate**) is a powerful Chrome extension designed to make web content accessible and digestible for everyone. Whether you have dyslexia, ADHD, or simply want a more focused reading experience, Elu adapts the web to your needs using on-device AI.
 
-## 🌟 Key Features
-
-- **Offline Text Simplification**: Powered by Chrome's built-in Gemini Nano for 100% offline processing and privacy
-- **Customizable Simplification Levels**: Choose between Low, Mid, and High simplification based on your needs
-- **Specialized Reading Support**: Optimize text processing for different reading requirements without compromising on content
-- **Accessibility-First Design**: Comprehensive text customization options including OpenDyslexic font support
-- **Real-Time Adjustments**: Instantly apply text formatting changes for the most comfortable reading experience
-
-## 🎯 Why Elu?
-
-Unlike traditional text summarizers, Elu is designed to preserve the complete reading experience. We believe everyone deserves to enjoy the full journey of reading while having content presented in a way that works best for them. Elu adapts the text presentation without sacrificing content or context.
-
-## ⚡ Prerequisites
-
-Before installing Elu, please ensure your system meets the following requirements:
-
-1. **Google Chrome Version**
-   - Install Chrome Dev channel (or Canary channel)
-   - Version must be ≥ 128.0.6545.0
-
-2. **System Requirements**
-   - Minimum 22 GB of free storage space
-   - Note: If available storage falls below 10 GB after download, the model will be automatically deleted
-   - For macOS users: Use Disk Utility to check accurate free disk space
-
-3. **Policy Acknowledgment**
-   - Review and acknowledge Google's Generative AI Prohibited Uses Policy
-
-## 🚀 Installation
-
-### Step 1: Enable Gemini Nano and Prompt API
-
-1. Open Chrome and navigate to `chrome://flags/#optimization-guide-on-device-model`
-2. Select "Enabled BypassPerfRequirement"
-   - This bypasses performance checks that might prevent Gemini Nano download
-3. Go to `chrome://flags/#prompt-api-for-gemini-nano`
-4. Select "Enabled"
-5. Relaunch Chrome
-
-### Step 2: Install Elu Extension
-
-1. Clone the repository:
-
-   ```bash
-   git clone https://github.com/tanhanwei/elu.git
-   ```
-
-2. Open Chrome Dev/Canary
-3. Navigate to `chrome://extensions/`
-4. Enable "Developer mode" (toggle in top right)
-5. Click "Load unpacked"
-6. Select the cloned `elu` directory
-7. The extension should now appear in your Chrome toolbar
-
-## ⚙️ Features in Detail
-
-### Text Simplification
-
-- Three simplification levels (Low, Mid, High)
-- Optimization options:
-  - General Reading Support
-  - Focus/Attention Support
-  - Reading Processing Support
-
-### Display Customization
-
-- OpenDyslexic font toggle
-- Multiple color themes:
-  - Default
-  - Cream Paper
-  - Dark Mode
-  - Sepia
-  - And more
-- Adjustable spacing controls:
-  - Line spacing
-  - Letter spacing
-  - Word spacing
-
-## 💡 How It Works
-
-Elu uses Chrome's built-in Gemini Nano AI to process and simplify text content while maintaining meaning and context. The extension:
-
-1. Analyzes the current webpage content
-2. Applies the selected simplification level
-3. Optimizes the text based on your chosen reading support option
-4. Instantly updates the page with the processed content
-5. Applies any custom display settings you've configured
-
-## 🔒 Privacy & Security
-
-- 100% offline processing using Chrome's built-in Gemini Nano
-- No data sent to external servers
-- No tracking or data collection
-- Complete privacy protection for all users
-
-## 📝 License
-
-MIT License
-
-## ⚠️ Troubleshooting
-
-If you encounter any issues:
-
-1. Verify you have sufficient disk space (>22 GB)
-2. Confirm Chrome version is compatible
-3. Check that all flags are properly enabled
-4. Try relaunching Chrome after enabling flags
+Powered by Google's **Gemini Nano**, Elu processes content entirely offline in your browser, ensuring your privacy while delivering intelligent text simplification, summarization, and cognitive support tools.
 
 ---
 
-Made with ❤️ for accessible reading
+## 🌟 Key Features
+
+### 🧠 Smart Chunking
+Break down long, overwhelming articles into bite-sized, manageable "chunks".
+- **Progress Tracking**: Visual progress bar and "Chunk X of Y" indicators.
+- **Read Time & Complexity**: Estimates reading time and complexity level for each section.
+- **Focus Controls**: Navigate with buttons or keyboard shortcuts, mark chunks as read, and bookmark key sections.
+
+### 🎯 Focus Mode
+eliminate distractions and immerse yourself in the content.
+- **Distraction-Free UI**: Dims irrelevant page elements to highlight the text.
+- **Bionic Reading Support**: Highlights the initial letters of words to guide the eye and improve reading speed/comprehension.
+
+### 🤖 AI-Powered Simplification
+Customize the complexity of text to match your reading level.
+- **3 Simplification Levels**: Low, Mid, High.
+- **Optimization Modes**:
+  - **Simplify Complex Ideas**: Breaks down difficult concepts.
+  - **Better Visual Organization**: Uses shorter sections and improved formatting.
+  - **Easier Reading Flow**: Optimizes sentence structure for smoother reading.
+
+### 🗣️ Text-to-Speech (TTS)
+Listen to your articles instead of reading them.
+- Integrated player with Play, Pause, Resume, and Stop controls directly in the extension popup.
+
+### 🎨 Visual Accessibility & Customization
+Tailor the reading environment to your visual preferences.
+- **OpenDyslexic Font**: Toggle the specialized font designed to mitigate some symptoms of dyslexia.
+- **Color Themes**: Choose from Default, Cream Paper, Dark Mode, Sepia, High Contrast, and more.
+- **Spacing Controls**: Fine-tune Line Spacing, Letter Spacing, and Word Spacing for maximum readability.
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+Elu relies on Chrome's built-in AI capabilities (Gemini Nano), which are currently available in Chrome Dev or Canary channels.
+
+1.  **Chrome Dev/Canary**: Version ≥ 128.0.6545.0.
+2.  **Storage**: Minimum 22 GB free disk space (to download the AI model).
+3.  **Hardware**: A GPU capable of running the model (most modern discrete or integrated GPUs).
+
+### Installation
+
+1.  **Clone the Repository**:
+    ```bash
+    git clone https://github.com/Sri-Krishna-V/Elu.git
+    cd Elu
+    ```
+
+2.  **Install Dependencies**:
+    ```bash
+    npm install
+    ```
+
+3.  **Build the Extension**:
+    ```bash
+    npm run build
+    ```
+    *(Or `npm run dev` for development with watch mode)*
+
+4.  **Load into Chrome**:
+    - Open `chrome://extensions/`.
+    - Enable **Developer mode** (toggle in top right).
+    - Click **Load unpacked**.
+    - Select the `dist` folder generated by the build.
+
+### Enabling Gemini Nano
+
+For the AI features to work, you must enable the on-device model flags:
+
+1.  Open Chrome and go to `chrome://flags/#optimization-guide-on-device-model`.
+    -   Select **Enabled BypassPerfRequirement**.
+2.  Go to `chrome://flags/#prompt-api-for-gemini-nano`.
+    -   Select **Enabled**.
+3.  **Relaunch Chrome**.
+    -   *Note: The model may take a few minutes to download after the first launch.*
+
+---
+
+## 📖 How to Use
+
+1.  **Open Elu**: Click the Elu icon in your Chrome toolbar on any article or content-heavy page.
+2.  **Choose Your Mode**:
+    -   **Simplify**: Select a Level (Low/Mid/High) and Mode, then click "Simplify Text".
+    -   **Chunk Mode**: Click "Chunk Mode" to break the article into slides.
+    -   **Focus Mode**: Click "Focus Mode" to dim distractions.
+3.  **Customize**: Click the **Settings (Gear Icon)** to access:
+    -   OpenDyslexic Font toggle.
+    -   Theme selection (Dark, Sepia, etc.).
+    -   Spacing sliders.
+4.  **Listen**: Use the playback controls at the bottom of the popup to start Text-to-Speech.
+
+---
+
+## 🔒 Privacy First
+
+Elu is built with a **Privacy-First** architecture.
+-   **100% Offline**: All text processing happens locally on your device using Chrome's built-in Gemini Nano model.
+-   **No Data Collection**: We do not collect, store, or transmit your reading data or personal information.
+-   **No External APIs**: Unlike other AI extensions, your data never leaves your browser.
+
+---
+
+## 🛠️ Built With
+
+-   **React / Vanilla JS**: Core extension logic.
+-   **Vite**: Build tool and bundler.
+-   **Chrome Extension Manifest V3**: Modern extension architecture.
+-   **Gemini Nano**: On-device AI model via Chrome's Prompt API.
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+1.  Fork the project
+2.  Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3.  Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4.  Push to the branch (`git push origin feature/AmazingFeature`)
+5.  Open a Pull Request
+
+---
+
+## 📄 License
+
+Distributed under the MIT License. See `LICENSE` for more information.
