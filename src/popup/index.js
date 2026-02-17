@@ -20,7 +20,10 @@ function initializePopup() {
 
     // Restore theme, toggle and slider states
     chrome.storage.sync.get(['selectedTheme'], function (result) {
-        document.getElementById('themeSelector').value = result.selectedTheme || 'default';
+        const theme = result.selectedTheme || 'default';
+        document.querySelectorAll('.theme-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.getAttribute('data-theme') === theme);
+        });
     });
     chrome.storage.sync.get(['lineSpacing', 'letterSpacing', 'wordSpacing'], function (result) {
         document.getElementById('lineSpacing').value = result.lineSpacing || 1.5;
@@ -46,7 +49,7 @@ function initializePopup() {
     if (chunkModeBtn) {
         chunkModeBtn.addEventListener('click', function () {
             chunkModeBtn.disabled = true;
-            chunkModeBtn.querySelector('span').textContent = 'Loading...';
+            chunkModeBtn.querySelector('span').textContent = 'Wait...';
 
             chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
                 if (tabs[0] && /^https?:/.test(tabs[0].url)) {
@@ -55,7 +58,7 @@ function initializePopup() {
                             console.error('Could not start chunk mode:', chrome.runtime.lastError.message);
                             chunkModeBtn.querySelector('span').textContent = 'Error!';
                         } else if (response && response.success) {
-                            chunkModeBtn.querySelector('span').textContent = 'Active!';
+                            chunkModeBtn.querySelector('span').textContent = 'On!';
                             // Close popup after activating
                             setTimeout(() => window.close(), 500);
                         } else {
@@ -64,7 +67,7 @@ function initializePopup() {
 
                         setTimeout(function () {
                             chunkModeBtn.disabled = false;
-                            chunkModeBtn.querySelector('span').textContent = 'Chunk Mode';
+                            chunkModeBtn.querySelector('span').textContent = 'Chunk';
                         }, 2000);
                     });
                 } else {
@@ -72,7 +75,7 @@ function initializePopup() {
                     chunkModeBtn.querySelector('span').textContent = 'Invalid Page';
                     setTimeout(function () {
                         chunkModeBtn.disabled = false;
-                        chunkModeBtn.querySelector('span').textContent = 'Chunk Mode';
+                        chunkModeBtn.querySelector('span').textContent = 'Chunk';
                     }, 2000);
                 }
             });
@@ -232,6 +235,38 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('mainContent').style.display = 'block';
     initializePopup();
 
+    // ── Populate Page Info Card ──
+    chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+        if (tabs[0] && /^https?:/.test(tabs[0].url)) {
+            const pageTitle = document.getElementById('pageTitle');
+            if (pageTitle) {
+                pageTitle.textContent = tabs[0].title || 'Untitled Page';
+                pageTitle.title = tabs[0].title || '';
+            }
+            // Request page analysis from content script
+            chrome.tabs.sendMessage(tabs[0].id, { action: 'getPageInfo' }, function (response) {
+                if (!chrome.runtime.lastError && response) {
+                    if (response.readTime) {
+                        const readTimeLabel = document.getElementById('readTimeLabel');
+                        if (readTimeLabel) readTimeLabel.textContent = response.readTime + ' min';
+                    }
+                    if (response.complexity) {
+                        const complexityLabel = document.getElementById('complexityLabel');
+                        const complexityTag = document.getElementById('complexityTag');
+                        if (complexityLabel) complexityLabel.textContent = response.complexity;
+                        if (complexityTag) {
+                            complexityTag.classList.remove('complexity-easy', 'complexity-medium', 'complexity-hard');
+                            complexityTag.classList.add('complexity-' + response.complexity.toLowerCase());
+                        }
+                    }
+                }
+            });
+        } else {
+            const pageTitle = document.getElementById('pageTitle');
+            if (pageTitle) pageTitle.textContent = 'Open a webpage to get started';
+        }
+    });
+
     // Add help icon click handler
     const helpIcon = document.querySelector('.help-icon');
     const simplificationGuide = document.getElementById('simplificationGuide');
@@ -253,7 +288,9 @@ document.addEventListener('DOMContentLoaded', function () {
         }, function () {
             // Update the UI elements
             document.getElementById('fontToggle').checked = false;
-            document.getElementById('themeSelector').value = 'default';
+            document.querySelectorAll('.theme-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.getAttribute('data-theme') === 'default');
+            });
 
             document.getElementById('lineSpacing').value = 1.5;
             document.getElementById('lineSpacingValue').textContent = '1.5';
@@ -266,18 +303,18 @@ document.addEventListener('DOMContentLoaded', function () {
 
             // Apply defaults to the current tab
             chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
-                if (tabs[0]) {
+                if (tabs[0] && /^https?:/.test(tabs[0].url)) {
                     // Reset font
                     chrome.tabs.sendMessage(tabs[0].id, {
                         action: 'toggleFont',
                         enabled: false
-                    });
+                    }, function () { if (chrome.runtime.lastError) console.warn(chrome.runtime.lastError.message); });
 
                     // Reset theme
                     chrome.tabs.sendMessage(tabs[0].id, {
                         action: 'applyTheme',
                         theme: 'default'
-                    });
+                    }, function () { if (chrome.runtime.lastError) console.warn(chrome.runtime.lastError.message); });
 
                     // Reset spacing
                     chrome.tabs.sendMessage(tabs[0].id, {
@@ -285,7 +322,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         lineSpacing: 1.5,
                         letterSpacing: 0,
                         wordSpacing: 0
-                    });
+                    }, function () { if (chrome.runtime.lastError) console.warn(chrome.runtime.lastError.message); });
                 }
             });
 
@@ -348,8 +385,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             });
         } else {
-            console.warn("Active tab is not a valid web page. Cannot get font state.");
-            fontToggle.checked = false; // Default to unchecked
+            fontToggle.checked = false; // Default to unchecked on non-web pages
         }
     });
 
@@ -370,8 +406,6 @@ document.addEventListener('DOMContentLoaded', function () {
                         console.error('Could not toggle font:', chrome.runtime.lastError.message);
                     }
                 });
-            } else {
-                console.warn("Active tab is not a valid web page. Cannot toggle font.");
             }
         });
     });
@@ -383,10 +417,14 @@ document.addEventListener('DOMContentLoaded', function () {
             const enabled = e.target.checked;
             chrome.storage.sync.set({ focusMode: enabled });
             chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
-                if (tabs[0]) {
+                if (tabs[0] && /^https?:/.test(tabs[0].url)) {
                     chrome.tabs.sendMessage(tabs[0].id, {
                         action: "toggleBionic",
                         enabled: enabled
+                    }, function () {
+                        if (chrome.runtime.lastError) {
+                            console.warn('Could not toggle bionic:', chrome.runtime.lastError.message);
+                        }
                     });
                 }
             });
@@ -394,7 +432,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     // Check TTS State
     chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
-        if (tabs[0]) {
+        if (tabs[0] && /^https?:/.test(tabs[0].url)) {
             chrome.tabs.sendMessage(tabs[0].id, { action: "getTTSState" }, function (response) {
                 if (!chrome.runtime.lastError && response && response.state) {
                     updateTTSControls(response.state);
@@ -410,15 +448,19 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function updateTTSControls(state) {
         if (!ttsPlay) return;
-        ttsPlay.style.display = state === 'stopped' ? 'inline-block' : 'none';
-        ttsPause.style.display = state === 'playing' ? 'inline-block' : 'none';
-        ttsResume.style.display = state === 'paused' ? 'inline-block' : 'none';
+        ttsPlay.style.display = state === 'stopped' ? 'flex' : 'none';
+        ttsPause.style.display = state === 'playing' ? 'flex' : 'none';
+        ttsResume.style.display = state === 'paused' ? 'flex' : 'none';
     }
 
     if (ttsPlay) {
         ttsPlay.addEventListener('click', () => {
             chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-                if (tabs[0]) chrome.tabs.sendMessage(tabs[0].id, { action: 'tts-play' });
+                if (tabs[0] && /^https?:/.test(tabs[0].url)) {
+                    chrome.tabs.sendMessage(tabs[0].id, { action: 'tts-play' }, function () {
+                        if (chrome.runtime.lastError) console.warn(chrome.runtime.lastError.message);
+                    });
+                }
                 updateTTSControls('playing');
             });
         });
@@ -427,7 +469,11 @@ document.addEventListener('DOMContentLoaded', function () {
     if (ttsPause) {
         ttsPause.addEventListener('click', () => {
             chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-                if (tabs[0]) chrome.tabs.sendMessage(tabs[0].id, { action: 'tts-pause' });
+                if (tabs[0] && /^https?:/.test(tabs[0].url)) {
+                    chrome.tabs.sendMessage(tabs[0].id, { action: 'tts-pause' }, function () {
+                        if (chrome.runtime.lastError) console.warn(chrome.runtime.lastError.message);
+                    });
+                }
                 updateTTSControls('paused');
             });
         });
@@ -436,7 +482,11 @@ document.addEventListener('DOMContentLoaded', function () {
     if (ttsResume) {
         ttsResume.addEventListener('click', () => {
             chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-                if (tabs[0]) chrome.tabs.sendMessage(tabs[0].id, { action: 'tts-resume' });
+                if (tabs[0] && /^https?:/.test(tabs[0].url)) {
+                    chrome.tabs.sendMessage(tabs[0].id, { action: 'tts-resume' }, function () {
+                        if (chrome.runtime.lastError) console.warn(chrome.runtime.lastError.message);
+                    });
+                }
                 updateTTSControls('playing');
             });
         });
@@ -445,7 +495,11 @@ document.addEventListener('DOMContentLoaded', function () {
     if (ttsStop) {
         ttsStop.addEventListener('click', () => {
             chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-                if (tabs[0]) chrome.tabs.sendMessage(tabs[0].id, { action: 'tts-stop' });
+                if (tabs[0] && /^https?:/.test(tabs[0].url)) {
+                    chrome.tabs.sendMessage(tabs[0].id, { action: 'tts-stop' }, function () {
+                        if (chrome.runtime.lastError) console.warn(chrome.runtime.lastError.message);
+                    });
+                }
                 updateTTSControls('stopped');
             });
         });
@@ -484,22 +538,11 @@ document.addEventListener('DOMContentLoaded', function () {
                         console.error('Could not adjust spacing:', chrome.runtime.lastError.message);
                     }
                 });
-            } else {
-                console.warn("Active tab is not a valid web page. Cannot adjust spacing.");
             }
         });
     }
 
     const debouncedApplySpacing = debounce(applySpacingAdjustments, 100);
-
-    // Debounce function implementation
-    function debounce(func, wait) {
-        let timeout;
-        return function (...args) {
-            clearTimeout(timeout);
-            timeout = setTimeout(() => func.apply(this, args), wait);
-        };
-    }
 
     // Define a debounced function to save settings and apply spacing
     const debouncedSaveAndApplySpacing = debounce(function () {
@@ -539,18 +582,26 @@ document.addEventListener('DOMContentLoaded', function () {
         debouncedSaveAndApplySpacing();
     });
 
-    // Theme Selector Handler
-    document.getElementById('themeSelector').addEventListener('change', function (e) {
-        const selectedTheme = e.target.value;
+    // Theme Buttons Handler
+    document.querySelectorAll('.theme-btn').forEach(btn => {
+        btn.addEventListener('click', function () {
+            const selectedTheme = this.getAttribute('data-theme');
 
-        // Save the selected theme
-        chrome.storage.sync.set({ selectedTheme: selectedTheme });
+            // Update active state
+            document.querySelectorAll('.theme-btn').forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
 
-        // Send message to content script to apply the theme
-        chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
-            chrome.tabs.sendMessage(tabs[0].id, {
-                action: 'applyTheme',
-                theme: selectedTheme
+            // Save the selected theme
+            chrome.storage.sync.set({ selectedTheme: selectedTheme });
+
+            // Send message to content script to apply the theme
+            chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+                if (tabs[0] && /^https?:/.test(tabs[0].url)) {
+                    chrome.tabs.sendMessage(tabs[0].id, {
+                        action: 'applyTheme',
+                        theme: selectedTheme
+                    });
+                }
             });
         });
     });
@@ -571,7 +622,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 });
             });
         } else {
-            console.warn("Active tab is not a valid web page. Cannot apply theme.");
         }
     });
 });

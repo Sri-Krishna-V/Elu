@@ -724,6 +724,25 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             case "focus-get-state":
                 sendResponse({ success: true, isActive: isFocusModeActive() });
                 break;
+
+            case "getPageInfo":
+                try {
+                    const bodyText = document.body.innerText || '';
+                    const words = bodyText.split(/\s+/).filter(w => w.length > 0);
+                    const wordCount = words.length;
+                    const readTime = Math.max(1, Math.round(wordCount / 200));
+                    const sentences = bodyText.split(/[.!?]+/).filter(s => s.trim().length > 0);
+                    const avgSentenceLen = sentences.length ? wordCount / sentences.length : 0;
+                    const avgWordLen = words.length ? words.reduce((sum, w) => sum + w.length, 0) / words.length : 0;
+                    let complexity = 'Easy';
+                    if (avgSentenceLen > 20 || avgWordLen > 6) complexity = 'Medium';
+                    if (avgSentenceLen > 30 || avgWordLen > 7) complexity = 'Hard';
+                    sendResponse({ readTime, complexity });
+                } catch (err) {
+                    console.error('Error computing page info:', err);
+                    sendResponse({ readTime: null, complexity: null });
+                }
+                break;
         }
         sendResponse({ success: true });
     })();

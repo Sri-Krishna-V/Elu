@@ -18,6 +18,20 @@ export const logger = {
         this._scheduleWrite();
     },
 
+    info(...args) {
+        const timestamp = new Date().toISOString();
+        const logEntry = `${timestamp} INFO: ${args.join(' ')}`;
+        this.logs.push(logEntry);
+        this._scheduleWrite();
+    },
+
+    warn(...args) {
+        const timestamp = new Date().toISOString();
+        const logEntry = `${timestamp} WARN: ${args.join(' ')}`;
+        this.logs.push(logEntry);
+        this._scheduleWrite();
+    },
+
     _scheduleWrite() {
         const now = Date.now();
         if (now - this.lastWrite >= this.writeInterval) {
@@ -29,7 +43,7 @@ export const logger = {
         if (this.logs.length === 0) return;
 
         const logText = this.logs.join('\n') + '\n';
-        const timestamp = new Date().toISOString().slice(0,19).replace(/:/g,'-');
+        const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
         const key = `log_${timestamp}`;
         const logData = {
             timestamp: timestamp,
@@ -51,12 +65,12 @@ export const logger = {
                 timestamp: timestamp,
                 logData: logData
             });
-            
+
             if (!response || !response.success) {
                 console.error('Failed to store logs:', response?.error || 'No response');
                 throw new Error(response?.error || 'Failed to store logs');
             }
-            
+
             console.log('Logs stored successfully:', {
                 key,
                 response,
