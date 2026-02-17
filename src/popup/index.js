@@ -163,6 +163,10 @@ simplifyButton.addEventListener('click', function () {
                     if (response && response.success) {
                         // Simplification succeeded
                         simplifyButtonText.textContent = 'Done!';
+                        // Show undo button
+                        const undoBtn = document.getElementById('undoSimplify');
+                        if (undoBtn) undoBtn.style.display = 'flex';
+                        announce('Text simplified successfully');
                     } else {
                         // Handle error
                         simplifyButtonText.textContent = 'Error!';
@@ -266,6 +270,157 @@ document.addEventListener('DOMContentLoaded', function () {
             if (pageTitle) pageTitle.textContent = 'Open a webpage to get started';
         }
     });
+
+    // ── AI Status Check ──
+    chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+        const dot = document.getElementById('aiStatusDot');
+        const text = document.getElementById('aiStatusText');
+        if (!dot || !text) return;
+
+        if (tabs[0] && /^https?:/.test(tabs[0].url)) {
+            chrome.tabs.sendMessage(tabs[0].id, { action: 'checkAIStatus' }, function (response) {
+                if (chrome.runtime.lastError || !response) {
+                    dot.className = 'ai-status-dot status-unavailable';
+                    text.textContent = 'AI status unknown';
+                    return;
+                }
+                if (response.status === 'ready') {
+                    dot.className = 'ai-status-dot status-ready';
+                    text.textContent = 'AI Model Ready';
+                } else if (response.status === 'downloading') {
+                    dot.className = 'ai-status-dot'; // yellow pulsing
+                    text.textContent = 'AI Model Downloading…';
+                } else {
+                    dot.className = 'ai-status-dot status-unavailable';
+                    text.textContent = response.message || 'AI Not Available';
+                }
+            });
+        } else {
+            dot.className = 'ai-status-dot status-unavailable';
+            text.textContent = 'Open a webpage first';
+        }
+    });
+
+    // ── Reading Profiles ──
+    const PROFILES = {
+        default: {
+            fontEnabled: false,
+            selectedTheme: 'default',
+            lineSpacing: 1.5,
+            letterSpacing: 0,
+            wordSpacing: 0,
+            simplificationLevel: '3',
+            focusMode: false
+        },
+        dyslexia: {
+            fontEnabled: true,
+            selectedTheme: 'creamPaper',
+            lineSpacing: 2.2,
+            letterSpacing: 2.0,
+            wordSpacing: 6,
+            simplificationLevel: '3',
+            focusMode: false
+        },
+        adhd: {
+            fontEnabled: false,
+            selectedTheme: 'darkMode',
+            lineSpacing: 1.8,
+            letterSpacing: 0.5,
+            wordSpacing: 3,
+            simplificationLevel: '5',
+            focusMode: false
+        },
+        lowvision: {
+            fontEnabled: false,
+            selectedTheme: 'highContrast',
+            lineSpacing: 2.5,
+            letterSpacing: 1.5,
+            wordSpacing: 5,
+            simplificationLevel: '3',
+            focusMode: false
+        }
+    };
+
+    // Restore saved profile
+    chrome.storage.sync.get(['activeProfile'], function (result) {
+        const profile = result.activeProfile || 'default';
+        document.querySelectorAll('.profile-btn').forEach(btn => {
+            const isActive = btn.dataset.profile === profile;
+            btn.setAttribute('aria-checked', isActive.toString());
+        });
+    });
+
+    document.querySelectorAll('.profile-btn').forEach(btn => {
+        btn.addEventListener('click', function () {
+            const profileName = this.dataset.profile;
+            const profile = PROFILES[profileName];
+            if (!profile) return;
+
+            // Update ARIA states
+            document.querySelectorAll('.profile-btn').forEach(b => b.setAttribute('aria-checked', 'false'));
+            this.setAttribute('aria-checked', 'true');
+
+            // Save profile and apply all settings
+            chrome.storage.sync.set({
+                activeProfile: profileName,
+                ...profile
+            }, function () {
+                // Update all UI elements to match the profile
+                document.getElementById('fontToggle').checked = profile.fontEnabled;
+                document.querySelectorAll('.theme-btn').forEach(b => {
+                    const isActive = b.getAttribute('data-theme') === profile.selectedTheme;
+                    b.classList.toggle('active', isActive);
+                    b.setAttribute('aria-checked', isActive.toString());
+                });
+                document.getElementById('lineSpacing').value = profile.lineSpacing;
+                document.getElementById('lineSpacingValue').textContent = profile.lineSpacing;
+                document.getElementById('letterSpacing').value = profile.letterSpacing;
+                document.getElementById('letterSpacingValue').textContent = profile.letterSpacing + 'px';
+                document.getElementById('wordSpacing').value = profile.wordSpacing;
+                document.getElementById('wordSpacingValue').textContent = profile.wordSpacing + 'px';
+
+                // Update simplification level
+                document.querySelectorAll('.simplification-button').forEach(b => {
+                    const isSelected = b.getAttribute('data-level') === profile.simplificationLevel;
+                    b.classList.toggle('selected', isSelected);
+                    b.setAttribute('aria-checked', isSelected.toString());
+                });
+
+                // Apply to current tab
+                chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+                    if (tabs[0] && /^https?:/.test(tabs[0].url)) {
+                        chrome.tabs.sendMessage(tabs[0].id, { action: 'toggleFont', enabled: profile.fontEnabled }, () => { if (chrome.runtime.lastError) { } });
+                        chrome.tabs.sendMessage(tabs[0].id, { action: 'applyTheme', theme: profile.selectedTheme }, () => { if (chrome.runtime.lastError) { } });
+                        chrome.tabs.sendMessage(tabs[0].id, {
+                            action: 'adjustSpacing',
+                            lineSpacing: profile.lineSpacing,
+                            letterSpacing: profile.letterSpacing,
+                            wordSpacing: profile.wordSpacing
+                        }, () => { if (chrome.runtime.lastError) { } });
+                    }
+                });
+
+                announce(`${profileName.charAt(0).toUpperCase() + profileName.slice(1)} profile applied`);
+            });
+        });
+    });
+
+    // ── Undo Simplification Button ──
+    const undoBtn = document.getElementById('undoSimplify');
+    if (undoBtn) {
+        undoBtn.addEventListener('click', function () {
+            chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+                if (tabs[0] && /^https?:/.test(tabs[0].url)) {
+                    chrome.tabs.sendMessage(tabs[0].id, { action: 'undoSimplify' }, function (response) {
+                        if (!chrome.runtime.lastError && response && response.success) {
+                            undoBtn.style.display = 'none';
+                            announce('Original text restored');
+                        }
+                    });
+                }
+            });
+        });
+    }
 
     // Add help icon click handler
     const helpIcon = document.querySelector('.help-icon');
@@ -448,9 +603,32 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function updateTTSControls(state) {
         if (!ttsPlay) return;
-        ttsPlay.style.display = state === 'stopped' ? 'flex' : 'none';
-        ttsPause.style.display = state === 'playing' ? 'flex' : 'none';
-        ttsResume.style.display = state === 'paused' ? 'flex' : 'none';
+        if (typeof state === 'object') {
+            // Full state object from getTTSState
+            const s = state;
+            ttsPlay.style.display = (!s.isPlaying || (!s.isPlaying && !s.isPaused)) ? 'flex' : 'none';
+            ttsPause.style.display = (s.isPlaying && !s.isPaused) ? 'flex' : 'none';
+            ttsResume.style.display = (s.isPlaying && s.isPaused) ? 'flex' : 'none';
+            // Update progress bar
+            if (s.isPlaying && s.total > 0) {
+                const pct = Math.round((s.current / s.total) * 100);
+                const ttsProgressBar = document.getElementById('ttsProgressBar');
+                const ttsProgressFill = document.getElementById('ttsProgressFill');
+                const ttsProgressText = document.getElementById('ttsProgressText');
+                if (ttsProgressBar) ttsProgressBar.style.display = 'block';
+                if (ttsProgressFill) ttsProgressFill.style.width = pct + '%';
+                if (ttsProgressText) ttsProgressText.textContent = `Reading paragraph ${s.current + 1} of ${s.total}`;
+            }
+        } else {
+            // Simple string state
+            ttsPlay.style.display = state === 'stopped' ? 'flex' : 'none';
+            ttsPause.style.display = state === 'playing' ? 'flex' : 'none';
+            ttsResume.style.display = state === 'paused' ? 'flex' : 'none';
+            if (state === 'stopped') {
+                const ttsProgressBar = document.getElementById('ttsProgressBar');
+                if (ttsProgressBar) ttsProgressBar.style.display = 'none';
+            }
+        }
     }
 
     if (ttsPlay) {
@@ -510,7 +688,82 @@ document.addEventListener('DOMContentLoaded', function () {
         if (message.action === 'tts-state-change') {
             updateTTSControls(message.state);
         }
+        if (message.action === 'ttsProgress') {
+            const ttsProgressBar = document.getElementById('ttsProgressBar');
+            const ttsProgressFill = document.getElementById('ttsProgressFill');
+            const ttsProgressText = document.getElementById('ttsProgressText');
+            if (message.isPlaying && message.total > 0) {
+                const pct = Math.round((message.current / message.total) * 100);
+                if (ttsProgressBar) ttsProgressBar.style.display = 'block';
+                if (ttsProgressFill) ttsProgressFill.style.width = pct + '%';
+                if (ttsProgressText) ttsProgressText.textContent = `Reading paragraph ${message.current + 1} of ${message.total}`;
+            } else {
+                if (ttsProgressBar) ttsProgressBar.style.display = 'none';
+            }
+        }
     });
+
+    // ── TTS Speed Slider ──
+    const ttsSpeed = document.getElementById('ttsSpeed');
+    const ttsSpeedValue = document.getElementById('ttsSpeedValue');
+    if (ttsSpeed) {
+        // Restore saved speed
+        chrome.storage.sync.get(['ttsSpeed'], function (result) {
+            const speed = result.ttsSpeed || 1.0;
+            ttsSpeed.value = speed;
+            if (ttsSpeedValue) ttsSpeedValue.textContent = speed + '×';
+        });
+
+        ttsSpeed.addEventListener('input', function (e) {
+            const speed = parseFloat(e.target.value);
+            if (ttsSpeedValue) ttsSpeedValue.textContent = speed.toFixed(1) + '×';
+            chrome.storage.sync.set({ ttsSpeed: speed });
+            chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+                if (tabs[0] && /^https?:/.test(tabs[0].url)) {
+                    chrome.tabs.sendMessage(tabs[0].id, { action: 'tts-set-speed', speed }, () => {
+                        if (chrome.runtime.lastError) { }
+                    });
+                }
+            });
+        });
+    }
+
+    // ── TTS Voice Selector ──
+    const ttsVoice = document.getElementById('ttsVoice');
+    if (ttsVoice) {
+        // Populate voices
+        function populateVoices() {
+            const voices = speechSynthesis.getVoices();
+            ttsVoice.innerHTML = '<option value="">Default</option>';
+            voices.filter(v => v.lang.startsWith('en')).forEach(voice => {
+                const option = document.createElement('option');
+                option.value = voice.name;
+                option.textContent = voice.name.replace(/Microsoft |Google /, '').substring(0, 25);
+                ttsVoice.appendChild(option);
+            });
+            // Restore saved voice
+            chrome.storage.sync.get(['ttsVoice'], function (result) {
+                if (result.ttsVoice) ttsVoice.value = result.ttsVoice;
+            });
+        }
+
+        if (speechSynthesis.getVoices().length) {
+            populateVoices();
+        }
+        speechSynthesis.addEventListener('voiceschanged', populateVoices);
+
+        ttsVoice.addEventListener('change', function (e) {
+            const voiceName = e.target.value;
+            chrome.storage.sync.set({ ttsVoice: voiceName });
+            chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+                if (tabs[0] && /^https?:/.test(tabs[0].url)) {
+                    chrome.tabs.sendMessage(tabs[0].id, { action: 'tts-set-voice', voiceName }, () => {
+                        if (chrome.runtime.lastError) { }
+                    });
+                }
+            });
+        });
+    }
 
     // Spacing adjustment handlers
     function debounce(func, wait) {
@@ -582,17 +835,22 @@ document.addEventListener('DOMContentLoaded', function () {
         debouncedSaveAndApplySpacing();
     });
 
-    // Theme Buttons Handler
+    // Theme Buttons Handler (with ARIA)
     document.querySelectorAll('.theme-btn').forEach(btn => {
         btn.addEventListener('click', function () {
             const selectedTheme = this.getAttribute('data-theme');
 
-            // Update active state
-            document.querySelectorAll('.theme-btn').forEach(b => b.classList.remove('active'));
+            // Update active state and ARIA
+            document.querySelectorAll('.theme-btn').forEach(b => {
+                b.classList.remove('active');
+                b.setAttribute('aria-checked', 'false');
+            });
             this.classList.add('active');
+            this.setAttribute('aria-checked', 'true');
 
             // Save the selected theme
             chrome.storage.sync.set({ selectedTheme: selectedTheme });
+            announce(selectedTheme + ' theme applied');
 
             // Send message to content script to apply the theme
             chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
@@ -621,7 +879,25 @@ document.addEventListener('DOMContentLoaded', function () {
                     }
                 });
             });
-        } else {
         }
     });
+
+    // ── ARIA state for simplification buttons ──
+    document.querySelectorAll('.simplification-button').forEach(btn => {
+        btn.addEventListener('click', function () {
+            document.querySelectorAll('.simplification-button').forEach(b => {
+                b.setAttribute('aria-checked', 'false');
+            });
+            this.setAttribute('aria-checked', 'true');
+        });
+    });
 });
+
+// ── Screen reader announcement helper ──
+function announce(message) {
+    const liveRegion = document.getElementById('liveRegion');
+    if (liveRegion) {
+        liveRegion.textContent = message;
+        setTimeout(() => { liveRegion.textContent = ''; }, 1000);
+    }
+}

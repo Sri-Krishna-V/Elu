@@ -4,8 +4,10 @@ let currentParagraphIndex = 0;
 let paragraphs = [];
 let isPlaying = false;
 let isPaused = false;
+let currentRate = 1.0;
+let currentVoiceName = '';
 
-export function handleTTSAction(action) {
+export function handleTTSAction(action, options = {}) {
     if (action === 'tts-play') {
         if (isPaused) {
             resumeReading();
@@ -18,126 +20,118 @@ export function handleTTSAction(action) {
         resumeReading();
     } else if (action === 'tts-stop') {
         stopReading();
+    } else if (action === 'tts-set-speed') {
+        currentRate = parseFloat(options.speed) || 1.0;
+        // If currently playing, restart at current paragraph with new speed
+        if (isPlaying && !isPaused) {
+            speechSynthesis.cancel();
+            speakParagraph(currentParagraphIndex);
+        }
+    } else if (action === 'tts-set-voice') {
+        currentVoiceName = options.voiceName || '';
+        // If currently playing, restart at current paragraph with new voice
+        if (isPlaying && !isPaused) {
+            speechSynthesis.cancel();
+            speakParagraph(currentParagraphIndex);
+        }
     }
 }
 
 function startReading() {
-    stopReading(); 
-    
-    // 1. Try simplified text
-    let elements = document.querySelectorAll('.simplified-text');
-    
-    // 2. Fallback to main content p tags if no simplified text
-    if (!elements || elements.length === 0) {
-        // Simple heuristic for main content
-        const article = document.querySelector('article, main, [role="main"], .content, #content');
-        if (article) {
-            elements = article.querySelectorAll('h1, h2, h3, p, li');
-        } else {
-            // Very broad fallback
-            elements = document.querySelectorAll('p');
-        }
-    }
-    
-    // Filter out empties/hidden
-    paragraphs = Array.from(elements).filter(el => {
-        return el.textContent.trim().length > 3 && el.offsetParent !== null;
-    });
-    
-    if (paragraphs.length === 0) {
-        alert("No text found to read.");
-        return;
-    }
-    
+    const bodyText = document.body.innerText;
+    paragraphs = bodyText
+        .split(/\n\n+/)
+        .map(p => p.trim())
+        .filter(p => p.length > 20);
+
+    if (paragraphs.length === 0) return;
+
     currentParagraphIndex = 0;
     isPlaying = true;
     isPaused = false;
-    
-    readNextParagraph();
+    speakParagraph(currentParagraphIndex);
 }
 
-function readNextParagraph() {
-    if (!isPlaying) return;
-    if (currentParagraphIndex >= paragraphs.length) {
+function speakParagraph(index) {
+    if (index >= paragraphs.length) {
         stopReading();
         return;
     }
-    
-    const element = paragraphs[currentParagraphIndex];
-    const text = element.textContent;
-    
-    highlightElement(element);
-    
-    utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 1.0;
-    
+
+    utterance = new SpeechSynthesisUtterance(paragraphs[index]);
+    utterance.rate = currentRate;
+    utterance.pitch = 1;
+
+    // Set voice if specified
+    if (currentVoiceName) {
+        const voices = speechSynthesis.getVoices();
+        const voice = voices.find(v => v.name === currentVoiceName);
+        if (voice) utterance.voice = voice;
+    }
+
     utterance.onend = () => {
-        unhighlightElement(element);
         currentParagraphIndex++;
-        if (isPlaying && !isPaused) {
-            readNextParagraph();
+        if (currentParagraphIndex < paragraphs.length) {
+            broadcastProgress();
+            speakParagraph(currentParagraphIndex);
+        } else {
+            stopReading();
         }
     };
-    
-    utterance.onerror = (e) => {
-        console.error("TTS Error:", e);
-        // Continue? Or stop?
-        unhighlightElement(element);
-        currentParagraphIndex++;
-        readNextParagraph();
+
+    utterance.onstart = () => {
+        broadcastProgress();
     };
-    
-    window.speechSynthesis.speak(utterance);
-}
 
-function highlightElement(el) {
-    el.dataset.originalBg = el.style.backgroundColor;
-    el.style.backgroundColor = '#ffeb3b4d'; // Yellow highlight
-    el.style.transition = 'background-color 0.3s';
-    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-}
-
-function unhighlightElement(el) {
-    el.style.backgroundColor = el.dataset.originalBg || '';
-    delete el.dataset.originalBg;
+    speechSynthesis.speak(utterance);
 }
 
 function pauseReading() {
-    if (isPlaying) {
-        window.speechSynthesis.pause();
+    if (speechSynthesis.speaking) {
+        speechSynthesis.pause();
         isPaused = true;
+        isPlaying = true;
     }
 }
 
 function resumeReading() {
-    if (isPlaying && isPaused) {
-        window.speechSynthesis.resume();
+    if (isPaused) {
+        speechSynthesis.resume();
         isPaused = false;
+        isPlaying = true;
     }
 }
 
 function stopReading() {
-    window.speechSynthesis.cancel();
+    speechSynthesis.cancel();
     isPlaying = false;
     isPaused = false;
-    
-    // Clean highlights
-    paragraphs.forEach(el => {
-        if (el.dataset.originalBg !== undefined) {
-             unhighlightElement(el);
-        }
-    });
-    paragraphs = [];
-    
+    currentParagraphIndex = 0;
+    utterance = null;
+    broadcastProgress();
+}
+
+function broadcastProgress() {
     try {
-        chrome.runtime.sendMessage({ action: 'tts-state-change', state: 'stopped' });
+        chrome.runtime.sendMessage({
+            action: 'ttsProgress',
+            current: currentParagraphIndex,
+            total: paragraphs.length,
+            isPlaying,
+            isPaused
+        });
     } catch (e) {
-        // Extensions context might be invalid if reloaded
+        // Popup may not be open
     }
 }
 
 export function getTTSState() {
-    if (isPaused) return 'paused';
-    if (isPlaying) return 'playing';
-    return 'stopped';
+    return {
+        isPlaying,
+        isPaused,
+        current: currentParagraphIndex,
+        total: paragraphs.length,
+        rate: currentRate,
+        voiceName: currentVoiceName
+    };
 }

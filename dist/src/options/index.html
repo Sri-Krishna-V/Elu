@@ -1,56 +1,611 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
+
 <head>
-    <title>Elu Options</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to Elu</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
+        :root {
+            --bg-cream: #f5efe6;
+            --bg-card: #fff8ee;
+            --white: #ffffff;
+            --outline: #2b2b2b;
+            --outline-light: #d4cfc6;
+            --accent-teal: #a8c3bc;
+            --accent-teal-light: #d4e8e2;
+            --accent-butter: #f0d98c;
+            --accent-rose: #e8b4b8;
+            --accent-lavender: #c5b8d9;
+            --text-primary: #2b2b2b;
+            --text-secondary: #5a5a5a;
+            --text-muted: #8a8a8a;
+            --font-mono: 'JetBrains Mono', 'IBM Plex Mono', monospace;
+            --radius: 14px;
+            --shadow: 4px 4px 0 #2b2b2b;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         body {
-            padding: 20px;
-            font-family: Arial, sans-serif;
+            font-family: var(--font-mono);
+            background: var(--bg-cream);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 40px 20px;
         }
-        .container {
-            max-width: 600px;
-            margin: 0 auto;
-        }
-        .form-group {
-            margin-bottom: 15px;
-        }
-        label {
-            display: block;
-            margin-bottom: 5px;
-        }
-        input[type="text"] {
+
+        .onboarding {
+            max-width: 640px;
             width: 100%;
-            padding: 8px;
-            margin-bottom: 10px;
         }
-        button {
-            padding: 10px 20px;
-            background-color: #3498db;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
+
+        .onboarding-header {
+            text-align: center;
+            margin-bottom: 40px;
         }
-        button:hover {
-            background-color: #2980b9;
+
+        .logo {
+            font-size: 48px;
+            font-weight: 700;
+            letter-spacing: -2px;
+            color: var(--text-primary);
+            margin-bottom: 8px;
         }
-        .status {
-            margin-top: 10px;
-            padding: 10px;
+
+        .logo span {
+            color: var(--accent-teal);
+        }
+
+        .tagline {
+            font-size: 13px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            font-weight: 500;
+        }
+
+        .step {
             display: none;
+            animation: fadeIn 0.4s ease;
         }
-        .success {
-            background-color: #2ecc71;
-            color: white;
+
+        .step.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(12px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .card {
+            background: var(--white);
+            border: 2.5px solid var(--outline);
+            border-radius: var(--radius);
+            padding: 32px;
+            box-shadow: var(--shadow);
+            margin-bottom: 24px;
+        }
+
+        .card h2 {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .card p {
+            font-size: 13px;
+            color: var(--text-secondary);
+            line-height: 1.7;
+            margin-bottom: 16px;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-top: 20px;
+        }
+
+        .feature-item {
+            background: var(--bg-card);
+            border: 2px solid var(--outline-light);
+            border-radius: 10px;
+            padding: 20px 16px;
+            text-align: center;
+            transition: all 0.2s ease;
+        }
+
+        .feature-item:hover {
+            transform: translateY(-2px);
+            border-color: var(--outline);
+            box-shadow: 2px 2px 0 var(--outline);
+        }
+
+        .feature-item i {
+            font-size: 24px;
+            margin-bottom: 10px;
+            display: block;
+        }
+
+        .feature-item .fi-teal i {
+            color: var(--accent-teal);
+        }
+
+        .feature-item:nth-child(1) i {
+            color: #7cae7a;
+        }
+
+        .feature-item:nth-child(2) i {
+            color: var(--accent-lavender);
+        }
+
+        .feature-item:nth-child(3) i {
+            color: var(--accent-butter);
+        }
+
+        .feature-item:nth-child(4) i {
+            color: var(--accent-rose);
+        }
+
+        .feature-item:nth-child(5) i {
+            color: var(--accent-teal);
+        }
+
+        .feature-item:nth-child(6) i {
+            color: #8eb5c9;
+        }
+
+        .feature-item h3 {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+        }
+
+        .feature-item p {
+            font-size: 10px;
+            color: var(--text-muted);
+            line-height: 1.5;
+            margin: 0;
+        }
+
+        /* Profile selection */
+        .profile-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-top: 20px;
+        }
+
+        .profile-card {
+            background: var(--bg-card);
+            border: 2.5px solid var(--outline-light);
+            border-radius: var(--radius);
+            padding: 24px 16px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .profile-card:hover {
+            transform: translateY(-2px);
+            border-color: var(--outline);
+        }
+
+        .profile-card.selected {
+            border-color: var(--outline);
+            background: var(--accent-teal-light);
+            box-shadow: var(--shadow);
+        }
+
+        .profile-card i {
+            font-size: 28px;
+            margin-bottom: 12px;
+            display: block;
+            color: var(--text-secondary);
+        }
+
+        .profile-card.selected i {
+            color: var(--text-primary);
+        }
+
+        .profile-card h3 {
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+        }
+
+        .profile-card p {
+            font-size: 10px;
+            color: var(--text-muted);
+            line-height: 1.5;
+            margin: 0;
+        }
+
+        /* Keyboard shortcuts table */
+        .shortcuts-table {
+            width: 100%;
+            margin-top: 16px;
+            border-collapse: separate;
+            border-spacing: 0 8px;
+        }
+
+        .shortcuts-table td {
+            padding: 10px 14px;
+            font-size: 12px;
+        }
+
+        .shortcuts-table tr {
+            background: var(--bg-card);
+            border-radius: 8px;
+        }
+
+        .shortcuts-table td:first-child {
+            border-radius: 8px 0 0 8px;
+            font-weight: 600;
+        }
+
+        .shortcuts-table td:last-child {
+            border-radius: 0 8px 8px 0;
+            color: var(--text-secondary);
+        }
+
+        kbd {
+            display: inline-block;
+            padding: 2px 8px;
+            font-family: var(--font-mono);
+            font-size: 11px;
+            font-weight: 600;
+            background: var(--white);
+            border: 1.5px solid var(--outline-light);
+            border-radius: 4px;
+            margin-right: 4px;
+        }
+
+        /* Navigation */
+        .nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 8px;
+        }
+
+        .step-dots {
+            display: flex;
+            gap: 8px;
+        }
+
+        .step-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--outline-light);
+            border: 1.5px solid var(--outline);
+            transition: all 0.3s ease;
+        }
+
+        .step-dot.active {
+            background: var(--accent-teal);
+            transform: scale(1.2);
+        }
+
+        .btn {
+            padding: 12px 28px;
+            font-family: var(--font-mono);
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            border: 2.5px solid var(--outline);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            min-height: 44px;
+        }
+
+        .btn-primary {
+            background: var(--accent-teal);
+            color: var(--text-primary);
+            box-shadow: 3px 3px 0 var(--outline);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 4px 4px 0 var(--outline);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: var(--text-secondary);
+            border-color: var(--outline-light);
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--outline);
+            color: var(--text-primary);
+        }
+
+        .btn-large {
+            display: block;
+            width: 100%;
+            padding: 16px 28px;
+            font-size: 14px;
+        }
+
+        .confetti {
+            font-size: 32px;
+            text-align: center;
+            margin-bottom: 16px;
+            animation: bounce 0.6s ease;
+        }
+
+        @keyframes bounce {
+
+            0%,
+            100% {
+                transform: translateY(0);
+            }
+
+            50% {
+                transform: translateY(-10px);
+            }
+        }
+
+        .tip-box {
+            background: var(--accent-teal-light);
+            border: 2px solid var(--accent-teal);
+            border-radius: 10px;
+            padding: 16px;
+            font-size: 11px;
+            line-height: 1.7;
+            color: var(--text-primary);
+            margin-top: 16px;
+        }
+
+        .tip-box strong {
+            display: block;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 4px;
+            font-size: 10px;
         }
     </style>
-  <script type="module" crossorigin src="/assets/options.js"></script>
-  <link rel="modulepreload" crossorigin href="/assets/modulepreload-polyfill.js">
 </head>
+
 <body>
-    <div class="container">
-        <h1>Elu Settings</h1>
-        <h2>Display Settings</h2>
-    </div>
+    <div class="onboarding">
+        <div class="onboarding-header">
+            <div class="logo">✿ <span>elu</span></div>
+            <div class="tagline">accessibility for every mind</div>
+        </div>
+
+        <!-- Step 1: Welcome -->
+        <div class="step active" data-step="1">
+            <div class="card">
+                <h2>Welcome to Elu ✿</h2>
+                <p>Elu is an AI-powered reading assistant designed to make web content more accessible for everyone —
+                    especially for those with dyslexia, ADHD, and cognitive differences.</p>
+                <p>Here's what Elu can do for you:</p>
+                <div class="feature-grid">
+                    <div class="feature-item">
+                        <i class="fas fa-wand-magic-sparkles"></i>
+                        <h3>AI Simplify</h3>
+                        <p>On-device AI rewrites complex text into clearer language</p>
+                    </div>
+                    <div class="feature-item">
+                        <i class="fas fa-layer-group"></i>
+                        <h3>Smart Chunks</h3>
+                        <p>Break long articles into bite-sized, manageable pieces</p>
+                    </div>
+                    <div class="feature-item">
+                        <i class="fas fa-eye"></i>
+                        <h3>Focus Mode</h3>
+                        <p>Dim distractions and play ambient sounds for concentration</p>
+                    </div>
+                    <div class="feature-item">
+                        <i class="fas fa-bold"></i>
+                        <h3>Bionic Reading</h3>
+                        <p>Bold word beginnings to guide your eyes faster</p>
+                    </div>
+                    <div class="feature-item">
+                        <i class="fas fa-volume-high"></i>
+                        <h3>Read Aloud</h3>
+                        <p>High-quality text-to-speech with speed & voice control</p>
+                    </div>
+                    <div class="feature-item">
+                        <i class="fas fa-font"></i>
+                        <h3>OpenDyslexic</h3>
+                        <p>Switch to a typeface designed for easier reading</p>
+                    </div>
+                </div>
+            </div>
+            <div class="nav">
+                <div></div>
+                <div class="step-dots">
+                    <div class="step-dot active"></div>
+                    <div class="step-dot"></div>
+                    <div class="step-dot"></div>
+                </div>
+                <button class="btn btn-primary" onclick="goToStep(2)">Next →</button>
+            </div>
+        </div>
+
+        <!-- Step 2: Choose Profile -->
+        <div class="step" data-step="2">
+            <div class="card">
+                <h2>Choose Your Profile</h2>
+                <p>Select the profile that best fits your reading needs. You can always change this later from the
+                    popup.</p>
+                <div class="profile-grid">
+                    <div class="profile-card selected" data-profile="default" onclick="selectProfile(this)">
+                        <i class="fas fa-font"></i>
+                        <h3>Default</h3>
+                        <p>Standard settings, great for everyone</p>
+                    </div>
+                    <div class="profile-card" data-profile="dyslexia" onclick="selectProfile(this)">
+                        <i class="fas fa-book-open"></i>
+                        <h3>Dyslexia</h3>
+                        <p>OpenDyslexic font, warm colors, extra spacing</p>
+                    </div>
+                    <div class="profile-card" data-profile="adhd" onclick="selectProfile(this)">
+                        <i class="fas fa-bolt"></i>
+                        <h3>ADHD</h3>
+                        <p>Dark mode, maximum simplification, less clutter</p>
+                    </div>
+                    <div class="profile-card" data-profile="lowvision" onclick="selectProfile(this)">
+                        <i class="fas fa-eye-low-vision"></i>
+                        <h3>Low Vision</h3>
+                        <p>High contrast, large spacing, increased readability</p>
+                    </div>
+                </div>
+            </div>
+            <div class="nav">
+                <button class="btn btn-secondary" onclick="goToStep(1)">← Back</button>
+                <div class="step-dots">
+                    <div class="step-dot"></div>
+                    <div class="step-dot active"></div>
+                    <div class="step-dot"></div>
+                </div>
+                <button class="btn btn-primary" onclick="goToStep(3)">Next →</button>
+            </div>
+        </div>
+
+        <!-- Step 3: Shortcuts & Done -->
+        <div class="step" data-step="3">
+            <div class="card">
+                <div class="confetti">🎉</div>
+                <h2>You're All Set!</h2>
+                <p>Here are some keyboard shortcuts to get you started quickly:</p>
+                <table class="shortcuts-table">
+                    <tr>
+                        <td><kbd>Alt</kbd>+<kbd>S</kbd></td>
+                        <td>Simplify the current page</td>
+                    </tr>
+                    <tr>
+                        <td><kbd>Alt</kbd>+<kbd>F</kbd></td>
+                        <td>Toggle Focus Mode</td>
+                    </tr>
+                    <tr>
+                        <td><kbd>Alt</kbd>+<kbd>R</kbd></td>
+                        <td>Read aloud (text-to-speech)</td>
+                    </tr>
+                </table>
+                <div class="tip-box">
+                    <strong>💡 Quick tip</strong>
+                    Click the Elu icon in your browser toolbar to open the popup and access all features. Your settings
+                    are saved automatically.
+                </div>
+            </div>
+            <div class="nav">
+                <button class="btn btn-secondary" onclick="goToStep(2)">← Back</button>
+                <div class="step-dots">
+                    <div class="step-dot"></div>
+                    <div class="step-dot"></div>
+                    <div class="step-dot active"></div>
+                </div>
+                <div></div>
+            </div>
+            <button class="btn btn-primary btn-large" onclick="finishOnboarding()" style="margin-top: 24px;">
+                Start Using Elu ✿
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let selectedProfile = 'default';
+
+        function goToStep(stepNum) {
+            document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+            document.querySelector(`[data-step="${stepNum}"]`).classList.add('active');
+        }
+
+        function selectProfile(el) {
+            document.querySelectorAll('.profile-card').forEach(c => c.classList.remove('selected'));
+            el.classList.add('selected');
+            selectedProfile = el.dataset.profile;
+        }
+
+        function finishOnboarding() {
+            // Save selected profile
+            const PROFILES = {
+                default: {
+                    fontEnabled: false,
+                    selectedTheme: 'default',
+                    lineSpacing: 1.5,
+                    letterSpacing: 0,
+                    wordSpacing: 0,
+                    simplificationLevel: '3',
+                    focusMode: false,
+                    activeProfile: 'default'
+                },
+                dyslexia: {
+                    fontEnabled: true,
+                    selectedTheme: 'creamPaper',
+                    lineSpacing: 2.2,
+                    letterSpacing: 2.0,
+                    wordSpacing: 6,
+                    simplificationLevel: '3',
+                    focusMode: false,
+                    activeProfile: 'dyslexia'
+                },
+                adhd: {
+                    fontEnabled: false,
+                    selectedTheme: 'darkMode',
+                    lineSpacing: 1.8,
+                    letterSpacing: 0.5,
+                    wordSpacing: 3,
+                    simplificationLevel: '5',
+                    focusMode: false,
+                    activeProfile: 'adhd'
+                },
+                lowvision: {
+                    fontEnabled: false,
+                    selectedTheme: 'highContrast',
+                    lineSpacing: 2.5,
+                    letterSpacing: 1.5,
+                    wordSpacing: 5,
+                    simplificationLevel: '3',
+                    focusMode: false,
+                    activeProfile: 'lowvision'
+                }
+            };
+
+            const profile = PROFILES[selectedProfile] || PROFILES.default;
+            chrome.storage.sync.set({
+                ...profile,
+                onboardingComplete: true
+            }, function () {
+                window.close();
+            });
+        }
+    </script>
 </body>
+
 </html>

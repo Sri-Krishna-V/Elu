@@ -327,69 +327,137 @@ function restoreElements() {
 }
 
 /**
- * Play ambient sound
+ * Play ambient sound using Web Audio API (fully offline)
  * @param {'rain'|'cafe'|'forest'|'whitenoise'} sound
  * @param {number} volume
  */
 function playAmbientSound(sound, volume) {
-    // Use audio URLs (these would need to be hosted or use Web Audio API for generation)
-    const soundUrls = {
-        rain: 'https://assets.mixkit.co/music/preview/mixkit-rain-sound-effect-2727.mp3',
-        cafe: 'https://assets.mixkit.co/music/preview/mixkit-calm-coffee-shop-ambience-2771.mp3',
-        forest: 'https://assets.mixkit.co/music/preview/mixkit-forest-birds-ambience-1210.mp3',
-        whitenoise: 'https://assets.mixkit.co/music/preview/mixkit-white-noise-ambience-100.mp3'
-    };
-
-    // For offline support, we'll generate simple white noise using Web Audio API
-    if (sound === 'whitenoise') {
-        playWhiteNoise(volume);
-        return;
-    }
-
-    // For other sounds, we'll skip for now as they require internet
-    // In production, these would be bundled as assets
-    logger.info(`Ambient sound ${sound} requested but requires internet connectivity`);
-    showNotification('Ambient sounds require internet', '🔇');
-}
-
-/**
- * Generate white noise using Web Audio API
- * @param {number} volume
- */
-function playWhiteNoise(volume) {
     try {
         const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        const bufferSize = 2 * audioContext.sampleRate;
-        const noiseBuffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
-        const output = noiseBuffer.getChannelData(0);
+        const gainNode = audioContext.createGain();
+        gainNode.gain.value = (volume / 100) * 0.15;
+        gainNode.connect(audioContext.destination);
 
-        for (let i = 0; i < bufferSize; i++) {
-            output[i] = Math.random() * 2 - 1;
+        let sourceNode;
+
+        if (sound === 'whitenoise') {
+            // Pure white noise
+            sourceNode = createNoiseSource(audioContext, 'white');
+            sourceNode.connect(gainNode);
+        } else if (sound === 'rain') {
+            // Brown noise + low-pass filter to simulate rain
+            sourceNode = createNoiseSource(audioContext, 'brown');
+            const lpFilter = audioContext.createBiquadFilter();
+            lpFilter.type = 'lowpass';
+            lpFilter.frequency.value = 400;
+            lpFilter.Q.value = 1.0;
+            sourceNode.connect(lpFilter);
+            lpFilter.connect(gainNode);
+            // Add a second higher layer for rain droplet texture
+            const textureNoise = createNoiseSource(audioContext, 'white');
+            const hpFilter = audioContext.createBiquadFilter();
+            hpFilter.type = 'bandpass';
+            hpFilter.frequency.value = 4000;
+            hpFilter.Q.value = 0.5;
+            const textureGain = audioContext.createGain();
+            textureGain.gain.value = 0.03;
+            textureNoise.connect(hpFilter);
+            hpFilter.connect(textureGain);
+            textureGain.connect(audioContext.destination);
+            textureNoise.start();
+        } else if (sound === 'cafe') {
+            // Pink noise (softer, more natural sounding)
+            sourceNode = createNoiseSource(audioContext, 'pink');
+            sourceNode.connect(gainNode);
+        } else if (sound === 'forest') {
+            // Layered: brown base + gentle high-frequency chirps via modulated noise
+            sourceNode = createNoiseSource(audioContext, 'brown');
+            const forestLP = audioContext.createBiquadFilter();
+            forestLP.type = 'lowpass';
+            forestLP.frequency.value = 800;
+            sourceNode.connect(forestLP);
+            forestLP.connect(gainNode);
+            // Subtle high-tone shimmer
+            const shimmer = createNoiseSource(audioContext, 'white');
+            const shimmerBP = audioContext.createBiquadFilter();
+            shimmerBP.type = 'bandpass';
+            shimmerBP.frequency.value = 6000;
+            shimmerBP.Q.value = 2.0;
+            const shimmerGain = audioContext.createGain();
+            shimmerGain.gain.value = 0.02;
+            shimmer.connect(shimmerBP);
+            shimmerBP.connect(shimmerGain);
+            shimmerGain.connect(audioContext.destination);
+            shimmer.start();
         }
 
-        const whiteNoise = audioContext.createBufferSource();
-        whiteNoise.buffer = noiseBuffer;
-        whiteNoise.loop = true;
-
-        const gainNode = audioContext.createGain();
-        gainNode.gain.value = (volume / 100) * 0.1; // Low volume
-
-        whiteNoise.connect(gainNode);
-        gainNode.connect(audioContext.destination);
-        whiteNoise.start();
+        if (sourceNode) {
+            sourceNode.start();
+        }
 
         // Store reference for cleanup
         audioElement = {
             pause: () => {
-                whiteNoise.stop();
-                audioContext.close();
+                try {
+                    audioContext.close();
+                } catch (e) { /* already closed */ }
             },
             src: ''
         };
+
+        logger.info(`Playing ${sound} ambient sound (offline)`);
     } catch (e) {
-        logger.error('Failed to create white noise:', e);
+        logger.error('Failed to create ambient sound:', e);
+        showNotification('Could not start ambient sound', '🔇');
     }
 }
+
+/**
+ * Create a noise buffer source (white, brown, or pink)
+ * @param {AudioContext} audioContext
+ * @param {'white'|'brown'|'pink'} type
+ * @returns {AudioBufferSourceNode}
+ */
+function createNoiseSource(audioContext, type) {
+    const bufferSize = 2 * audioContext.sampleRate;
+    const noiseBuffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
+    const output = noiseBuffer.getChannelData(0);
+
+    if (type === 'white') {
+        for (let i = 0; i < bufferSize; i++) {
+            output[i] = Math.random() * 2 - 1;
+        }
+    } else if (type === 'brown') {
+        let lastOut = 0;
+        for (let i = 0; i < bufferSize; i++) {
+            const white = Math.random() * 2 - 1;
+            output[i] = (lastOut + (0.02 * white)) / 1.02;
+            lastOut = output[i];
+            output[i] *= 3.5; // Compensate for volume loss
+        }
+    } else if (type === 'pink') {
+        // Voss-McCartney approximation
+        let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+        for (let i = 0; i < bufferSize; i++) {
+            const white = Math.random() * 2 - 1;
+            b0 = 0.99886 * b0 + white * 0.0555179;
+            b1 = 0.99332 * b1 + white * 0.0750759;
+            b2 = 0.96900 * b2 + white * 0.1538520;
+            b3 = 0.86650 * b3 + white * 0.3104856;
+            b4 = 0.55000 * b4 + white * 0.5329522;
+            b5 = -0.7616 * b5 - white * 0.0168980;
+            output[i] = b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362;
+            output[i] *= 0.11; // Normalize
+            b6 = white * 0.115926;
+        }
+    }
+
+    const source = audioContext.createBufferSource();
+    source.buffer = noiseBuffer;
+    source.loop = true;
+    return source;
+}
+
 
 /**
  * Start Pomodoro timer
@@ -407,13 +475,14 @@ function startTimer(minutes) {
                 position: fixed;
                 bottom: 20px;
                 right: 20px;
-                background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-                color: white;
+                background: #f5efe6;
+                color: #2b2b2b;
                 padding: 15px 25px;
-                border-radius: 15px;
-                font-family: 'Segoe UI', sans-serif;
+                border-radius: 14px;
+                border: 2.5px solid #2b2b2b;
+                font-family: 'JetBrains Mono', 'IBM Plex Mono', monospace;
                 z-index: 10001;
-                box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+                box-shadow: 4px 4px 0 #2b2b2b;
                 display: flex;
                 align-items: center;
                 gap: 15px;
@@ -424,29 +493,33 @@ function startTimer(minutes) {
                 font-size: 28px;
                 font-weight: 700;
                 font-variant-numeric: tabular-nums;
-                color: #00d9ff;
+                color: #2b2b2b;
             }
             
             .elu-timer-label {
-                font-size: 12px;
-                color: #a0a0a0;
+                font-size: 10px;
+                color: #5a5a5a;
                 text-transform: uppercase;
                 letter-spacing: 1px;
+                font-weight: 600;
             }
             
             .elu-timer-btn {
-                background: rgba(255, 255, 255, 0.1);
-                border: none;
-                color: white;
+                background: #a8c3bc;
+                border: 2px solid #2b2b2b;
+                color: #2b2b2b;
                 padding: 8px 12px;
                 border-radius: 8px;
                 cursor: pointer;
                 font-size: 14px;
-                transition: background 0.2s;
+                font-family: 'JetBrains Mono', monospace;
+                font-weight: 600;
+                transition: all 0.2s ease;
             }
             
             .elu-timer-btn:hover {
-                background: rgba(255, 255, 255, 0.2);
+                background: #93b3ab;
+                transform: translateY(-1px);
             }
         </style>
         <div>

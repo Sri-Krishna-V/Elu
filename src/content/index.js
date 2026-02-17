@@ -372,7 +372,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                             // Send the chunkText as the prompt with retries and API reinitialization
                             let simplifiedText = '';
                             let attempts = 0;
-                            const maxAttempts = 20;
+                            const maxAttempts = 5;
 
                             while (attempts < maxAttempts) {
                                 try {
@@ -566,20 +566,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                         }
                     }
 
-                    // Add visual feedback
-                    const notification = document.createElement('div');
-                    notification.textContent = 'Text simplified';
-                    notification.style.position = 'fixed';
-                    notification.style.top = '20px';
-                    notification.style.left = '50%';
-                    notification.style.transform = 'translateX(-50%)';
-                    notification.style.backgroundColor = '#3498db';
-                    notification.style.color = 'white';
-                    notification.style.padding = '10px 20px';
-                    notification.style.borderRadius = '5px';
-                    notification.style.zIndex = '10000';
-                    document.body.appendChild(notification);
-                    setTimeout(() => notification.remove(), 3000);
+                    // Add visual feedback (retro pastel theme)
+                    showEluNotification('Text simplified ✓');
 
                     // Only send success response after everything is complete
                     sendResponse({ success: true });
@@ -631,6 +619,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             case "tts-resume":
             case "tts-stop":
                 handleTTSAction(request.action);
+                sendResponse({ success: true });
+                break;
+
+            case "tts-set-speed":
+                handleTTSAction('tts-set-speed', { speed: request.speed });
+                sendResponse({ success: true });
+                break;
+
+            case "tts-set-voice":
+                handleTTSAction('tts-set-voice', { voiceName: request.voiceName });
                 sendResponse({ success: true });
                 break;
 
@@ -741,6 +739,70 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 } catch (err) {
                     console.error('Error computing page info:', err);
                     sendResponse({ readTime: null, complexity: null });
+                }
+                break;
+
+            case "checkAIStatus":
+                try {
+                    if (!self.ai || !self.ai.languageModel) {
+                        sendResponse({ status: 'unavailable', message: 'AI not supported in this browser' });
+                    } else {
+                        const capabilities = await self.ai.languageModel.capabilities();
+                        if (capabilities.available === 'readily') {
+                            sendResponse({ status: 'ready', message: 'AI model ready' });
+                        } else if (capabilities.available === 'after-download') {
+                            sendResponse({ status: 'downloading', message: 'AI model downloading…' });
+                        } else {
+                            sendResponse({ status: 'unavailable', message: 'AI model not available' });
+                        }
+                    }
+                } catch (err) {
+                    sendResponse({ status: 'unavailable', message: err.message });
+                }
+                break;
+
+            case "undoSimplify":
+                try {
+                    const mainContent = document.querySelector('main, article, .content, .post, #content, #main, div[role="main"]');
+                    if (mainContent) {
+                        const simplified = mainContent.querySelectorAll('[data-original-html]');
+                        simplified.forEach(el => {
+                            const originalHTML = el.getAttribute('data-original-html');
+                            const tempDiv = document.createElement('div');
+                            tempDiv.innerHTML = originalHTML;
+                            const originalElement = tempDiv.firstChild;
+                            el.parentNode.replaceChild(originalElement, el);
+                        });
+                        showEluNotification('Original text restored ✓');
+                        sendResponse({ success: true, restored: simplified.length });
+                    } else {
+                        sendResponse({ success: false, error: 'No content found' });
+                    }
+                } catch (err) {
+                    sendResponse({ success: false, error: err.message });
+                }
+                break;
+
+            case "simplifyText":
+                // Keyboard shortcut version — trigger same as "simplify"
+                try {
+                    await ensureInitialized();
+                    // Forward to the simplify handler by re-dispatching
+                    chrome.runtime.sendMessage({ action: 'simplify' });
+                    sendResponse({ success: true });
+                } catch (err) {
+                    sendResponse({ success: false, error: err.message });
+                }
+                break;
+
+            case "toggleFocusMode":
+                // Keyboard shortcut version
+                try {
+                    const kbConfig = await getFocusConfig();
+                    await toggleFocusMode(kbConfig);
+                    sendResponse({ success: true, isActive: isFocusModeActive() });
+                } catch (err) {
+                    sendResponse({ success: false, error: err.message });
                 }
                 break;
         }
@@ -925,7 +987,7 @@ function applySpacingAdjustments(lineSpacing, letterSpacing, wordSpacing) {
     document.head.appendChild(style);
 }
 
-// Function to apply selected theme
+// Function to apply selected theme (scoped to text-bearing elements only)
 function applyTheme(themeName) {
     const theme = themes[themeName];
     if (!theme) return;
@@ -939,16 +1001,64 @@ function applyTheme(themeName) {
         document.head.appendChild(themeStyle);
     }
 
+    // Scope to text-bearing elements only — preserves images, SVGs, buttons, forms, code blocks
+    const textSelectors = 'p, h1, h2, h3, h4, h5, h6, li, span:not(.elu-*), a, td, th, blockquote, figcaption, label, dd, dt';
+
     themeStyle.textContent = `
         html, body {
             background-color: ${backgroundColor} !important;
             color: ${textColor} !important;
         }
-        body * {
+        main, article, [role="main"], .content, #content {
             background-color: ${backgroundColor} !important;
+        }
+        ${textSelectors} {
             color: ${textColor} !important;
         }
+        /* Exclude Elu's own injected UI */
+        [class^="elu-"], [id^="elu-"] {
+            background-color: unset !important;
+            color: unset !important;
+        }
     `;
+}
+
+// Themed in-page notification (retro pastel style)
+function showEluNotification(message, icon = '✿') {
+    const notification = document.createElement('div');
+    notification.textContent = `${icon} ${message}`;
+    Object.assign(notification.style, {
+        position: 'fixed',
+        top: '20px',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        background: '#f5efe6',
+        color: '#2b2b2b',
+        border: '2.5px solid #2b2b2b',
+        padding: '12px 24px',
+        borderRadius: '12px',
+        fontFamily: "'JetBrains Mono', 'IBM Plex Mono', monospace",
+        fontSize: '13px',
+        fontWeight: '600',
+        zIndex: '2147483646',
+        boxShadow: '4px 4px 0 #2b2b2b',
+        letterSpacing: '0.3px',
+        textTransform: 'uppercase',
+        animation: 'none',
+        opacity: '0',
+        transition: 'opacity 0.3s ease, transform 0.3s ease'
+    });
+    document.body.appendChild(notification);
+    // Animate in
+    requestAnimationFrame(() => {
+        notification.style.opacity = '1';
+        notification.style.transform = 'translateX(-50%) translateY(0)';
+    });
+    setTimeout(() => {
+        notification.style.opacity = '0';
+        notification.style.transform = 'translateX(-50%) translateY(-10px)';
+        setTimeout(() => notification.remove(), 300);
+    }, 3000);
 }
 
 

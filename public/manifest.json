@@ -17,19 +17,55 @@
   "action": {
     "default_popup": "src/popup/index.html"
   },
+  "commands": {
+    "simplify-page": {
+      "suggested_key": {
+        "default": "Alt+S"
+      },
+      "description": "Simplify Page"
+    },
+    "toggle-focus": {
+      "suggested_key": {
+        "default": "Alt+F"
+      },
+      "description": "Toggle Focus Mode"
+    },
+    "toggle-tts": {
+      "suggested_key": {
+        "default": "Alt+R"
+      },
+      "description": "Toggle Read Aloud"
+    }
+  },
   "background": {
     "service_worker": "assets/background.js",
     "type": "module"
   },
-  "content_scripts": [{
-    "matches": ["<all_urls>"],
-    "js": ["content-loader.js"],
-    "css": ["assets/content.css"],
-    "run_at": "document_start"
-  }],
-  "web_accessible_resources": [{
-    "resources": ["assets/*", "fonts/*", "images/*"],
-    "matches": ["<all_urls>"]
-  }],
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "content-loader.js"
+      ],
+      "css": [
+        "assets/content.css"
+      ],
+      "run_at": "document_start"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "assets/*",
+        "fonts/*",
+        "images/*"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
+  ],
   "options_page": "src/options/index.html"
 }
