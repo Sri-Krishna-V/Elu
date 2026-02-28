@@ -173,8 +173,10 @@ simplifyButton.addEventListener('click', function () {
                         console.error("Simplification failed:", response.error);
                     }
 
-                    // Hide the loader
+                    // Hide the loader and progress bar
                     loader.style.display = 'none';
+                    const simplifyProgress = document.getElementById('simplifyProgress');
+                    if (simplifyProgress) simplifyProgress.style.display = 'none';
 
                     // After a delay, reset the button
                     setTimeout(function () {
@@ -683,7 +685,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // Listen for TTS state updates from content script
+    // Listen for TTS state updates and progress from content script
     chrome.runtime.onMessage.addListener((message) => {
         if (message.action === 'tts-state-change') {
             updateTTSControls(message.state);
@@ -699,6 +701,17 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (ttsProgressText) ttsProgressText.textContent = `Reading paragraph ${message.current + 1} of ${message.total}`;
             } else {
                 if (ttsProgressBar) ttsProgressBar.style.display = 'none';
+            }
+        }
+        if (message.action === 'simplifyProgress') {
+            const simplifyProgress = document.getElementById('simplifyProgress');
+            const simplifyProgressFill = document.getElementById('simplifyProgressFill');
+            const simplifyProgressText = document.getElementById('simplifyProgressText');
+            if (message.total > 0) {
+                const pct = Math.round(((message.current + 1) / message.total) * 100);
+                if (simplifyProgress) simplifyProgress.style.display = 'block';
+                if (simplifyProgressFill) simplifyProgressFill.style.width = pct + '%';
+                if (simplifyProgressText) simplifyProgressText.textContent = `Simplifying chunk ${message.current + 1} of ${message.total}…`;
             }
         }
     });

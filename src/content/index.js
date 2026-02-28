@@ -334,7 +334,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                     console.log(`Grouped content into ${chunks.length} chunks`);
 
                     // Process each chunk
+                    let chunkIndex = 0;
                     for (let chunk of chunks) {
+                        // Broadcast progress to popup
+                        try {
+                            chrome.runtime.sendMessage({
+                                action: 'simplifyProgress',
+                                current: chunkIndex,
+                                total: chunks.length
+                            });
+                        } catch (e) { /* popup may be closed */ }
                         // Log full chunk details before processing
                         console.log('Processing chunk:', {
                             elements: chunk.length,
@@ -564,6 +573,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                                 text: chunkText.substring(0, 100) + '...'
                             });
                         }
+                        chunkIndex++;
                     }
 
                     // Add visual feedback (retro pastel theme)
@@ -782,29 +792,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                     sendResponse({ success: false, error: err.message });
                 }
                 break;
-
-            case "simplifyText":
-                // Keyboard shortcut version — trigger same as "simplify"
-                try {
-                    await ensureInitialized();
-                    // Forward to the simplify handler by re-dispatching
-                    chrome.runtime.sendMessage({ action: 'simplify' });
-                    sendResponse({ success: true });
-                } catch (err) {
-                    sendResponse({ success: false, error: err.message });
-                }
-                break;
-
-            case "toggleFocusMode":
-                // Keyboard shortcut version
-                try {
-                    const kbConfig = await getFocusConfig();
-                    await toggleFocusMode(kbConfig);
-                    sendResponse({ success: true, isActive: isFocusModeActive() });
-                } catch (err) {
-                    sendResponse({ success: false, error: err.message });
-                }
-                break;
         }
         sendResponse({ success: true });
     })();
@@ -1002,7 +989,7 @@ function applyTheme(themeName) {
     }
 
     // Scope to text-bearing elements only — preserves images, SVGs, buttons, forms, code blocks
-    const textSelectors = 'p, h1, h2, h3, h4, h5, h6, li, span:not(.elu-*), a, td, th, blockquote, figcaption, label, dd, dt';
+    const textSelectors = 'p, h1, h2, h3, h4, h5, h6, li, span:not([class^="elu-"]), a, td, th, blockquote, figcaption, label, dd, dt';
 
     themeStyle.textContent = `
         html, body {

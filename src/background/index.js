@@ -27,8 +27,8 @@ chrome.commands.onCommand.addListener(async (command) => {
     if (!tab?.id) return;
 
     const actionMap = {
-        'simplify-page': 'simplifyText',
-        'toggle-focus': 'toggleFocusMode',
+        'simplify-page': 'simplify',
+        'toggle-focus': 'focus-toggle',
         'toggle-tts': 'tts-play'
     };
 
