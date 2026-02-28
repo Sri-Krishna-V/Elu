@@ -31,14 +31,14 @@ Elu (short for **Elucidate**) is a Chrome extension that transforms web content 
 
 ### AI Text Simplification
 
-Rewrites page content using Chrome's built-in Gemini Nano model (via the `window.ai.languageModel` Prompt API). The simplification pipeline selects a system prompt based on two user-controlled axes:
+Rewrites page content using **Llama-3.2-1B-Instruct-q4f16_1-MLC** running entirely on-device via [WebLLM](https://github.com/mlc-ai/web-llm) and WebGPU. The model runs inside a dedicated **offscreen document** with a Web Worker so inference never blocks the extension UI. The simplification pipeline selects a system prompt based on two user-controlled axes:
 
 - **Optimization mode** — `textClarity` (general readability), `focusStructure` (ADHD-oriented paragraph chunking), or `wordPattern` (dyslexia-oriented sentence patterning).
 - **Simplification level** — 1 through 5, where level 1 lightly improves structure and level 5 rewrites in the simplest possible language. The UI exposes 3 levels (Low / Mid / High) by default, configurable via `src/common/config.js`.
 
 System prompts are defined in `src/background/prompts.js` as a nested object keyed by `[mode][level]`. They are fetched by the content script from the background service worker via `chrome.runtime.sendMessage`.
 
-The content script initializes a `languageModel` session with `defaultTemperature` and `defaultTopK` from `self.ai.languageModel.capabilities()`, then streams the simplification result through the session. The output is rendered as HTML using the `marked` library.
+The content script sends inference requests to the background service worker, which routes them to the offscreen document. The offscreen document maintains a serial inference queue to prevent concurrent model conflicts. Responses are returned via the OpenAI-compatible chat completions API provided by WebLLM. The output is rendered as HTML using the `marked` library.
 
 ### Smart Content Chunking
 
@@ -89,7 +89,7 @@ Provides on-demand word definitions via double-click:
 
 - Filters out common English words using a pre-bundled dictionary set (`src/common/dictionary.js`) to avoid trivial lookups.
 - Ignores selections containing whitespace (single words only) and words longer than 40 characters.
-- Fetches a definition from Gemini Nano via the `window.ai.languageModel` API.
+- Fetches a definition from the WebLLM engine via the background → offscreen inference pipeline (same Llama-3.2-1B model used for simplification).
 - Renders the definition in a Shadow DOM tooltip anchored below the selected word, using a fade-in animation. Shadow DOM isolation prevents host-page styles from affecting the tooltip.
 
 ### Visual Accessibility and Customization
@@ -121,43 +121,56 @@ Additional typography controls:
 
 ## Architecture
 
-Elu follows the standard Chrome Extension Manifest V3 architecture, composed of four execution contexts:
+Elu follows the standard Chrome Extension Manifest V3 architecture, composed of five execution contexts:
 
 ```
-┌───────────────────────────────────────────────┐
-│                  Chrome Browser               │
-│                                               │
-│  ┌─────────────────┐   ┌──────────────────┐  │
-│  │  Popup UI        │   │  Options Page    │  │
-│  │  (src/popup/)    │   │  (src/options/)  │  │
-│  └────────┬─────────┘   └──────────────────┘  │
-│           │ chrome.tabs.sendMessage            │
-│  ┌────────▼─────────────────────────────────┐ │
-│  │  Content Script (src/content/index.js)   │ │
-│  │  Injected into every web page            │ │
-│  │  - AI simplification                     │ │
-│  │  - Smart chunking                        │ │
-│  │  - Focus mode                            │ │
-│  │  - Bionic reading                        │ │
-│  │  - TTS                                   │ │
-│  │  - Glossary                              │ │
-│  │  - Visual customization                  │ │
-│  └────────┬─────────────────────────────────┘ │
-│           │ chrome.runtime.sendMessage         │
-│  ┌────────▼─────────────────────────────────┐ │
-│  │  Background Service Worker               │ │
-│  │  (src/background/index.js)               │ │
-│  │  - Keyboard command routing              │ │
-│  │  - System prompt delivery               │ │
-│  │  - Install-time onboarding               │ │
-│  └──────────────────────────────────────────┘ │
-└───────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│                         Chrome Browser                           │
+│                                                                  │
+│  ┌─────────────────┐   ┌──────────────────┐                     │
+│  │  Popup UI        │   │  Options Page    │                     │
+│  │  (src/popup/)    │   │  (src/options/)  │                     │
+│  └────────┬─────────┘   └──────────────────┘                     │
+│           │ chrome.tabs.sendMessage                               │
+│  ┌────────▼──────────────────────────────────┐                   │
+│  │  Content Script (src/content/index.js)    │                   │
+│  │  Injected into every web page             │                   │
+│  │  - AI simplification (delegates to bg)    │                   │
+│  │  - Smart chunking                         │                   │
+│  │  - Focus mode                             │                   │
+│  │  - Bionic reading                         │                   │
+│  │  - TTS                                    │                   │
+│  │  - Glossary                               │                   │
+│  │  - Visual customization                   │                   │
+│  └────────┬──────────────────────────────────┘                   │
+│           │ chrome.runtime.sendMessage                            │
+│  ┌────────▼──────────────────────────────────┐                   │
+│  │  Background Service Worker                │                   │
+│  │  (src/background/index.js)                │                   │
+│  │  - Keyboard command routing               │                   │
+│  │  - System prompt delivery                 │                   │
+│  │  - Install-time onboarding                │                   │
+│  │  - Offscreen document lifecycle           │                   │
+│  │  - LLM request routing                    │                   │
+│  └────────┬──────────────────────────────────┘                   │
+│           │ chrome.runtime.sendMessage({ target: 'offscreen' })  │
+│  ┌────────▼──────────────────────────────────┐                   │
+│  │  Offscreen Document (src/offscreen/)      │                   │
+│  │  - WebLLM engine manager                  │                   │
+│  │  - Serial inference queue                 │  ┌─────────────┐ │
+│  │  - Model download progress broadcast      ├──▶ Web Worker   │ │
+│  │                                           │  │ (WebGPU /    │ │
+│  │  Llama-3.2-1B-Instruct-q4f16_1-MLC       │  │  WebAssembly)│ │
+│  └───────────────────────────────────────────┘  └─────────────┘ │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
 **Communication flow:**
 
 - The popup sends commands to the content script via `chrome.tabs.sendMessage`.
 - The content script requests system prompts from the background service worker via `chrome.runtime.sendMessage({ action: 'getSystemPrompts' })`.
+- LLM inference requests flow: **content script → background → offscreen document → Web Worker (WebGPU)**. The background service worker creates the offscreen document on demand and routes `llmInfer` messages to it.
+- The offscreen document broadcasts model download/compile progress to all extension pages (popup, options) via `chrome.runtime.sendMessage({ action: 'modelProgress' })`.
 - The background service worker routes keyboard shortcut commands (`Alt+S`, `Alt+F`, `Alt+R`) to the active tab's content script.
 - All persistent state (settings, reading progress, focus config) is stored in `chrome.storage.sync`.
 
@@ -196,9 +209,13 @@ Elu/
 │   │   ├── index.html          # Popup markup
 │   │   ├── index.js            # Popup logic: settings, controls, TTS playback UI
 │   │   └── popup.css           # Popup styles
-│   └── options/
-│       ├── index.html          # Options/onboarding page markup
-│       └── index.js            # Options page logic
+│   ├── options/
+│   │   ├── index.html          # Options/onboarding page markup
+│   │   └── index.js            # Options page logic
+│   └── offscreen/
+│       ├── index.html          # Offscreen document markup (hosts WebLLM engine)
+│       ├── index.js            # Engine manager, serial inference queue, message handler
+│       └── webllm-worker.js    # Web Worker running WebGPU/WebAssembly inference
 ├── vite.config.js              # Vite build configuration (multi-entry)
 └── package.json
 ```
@@ -211,8 +228,11 @@ Elu/
 
 The Manifest V3 service worker. Responsibilities:
 
-- **Install handler**: On first install, clears any stale `readingLevel` from storage and opens the onboarding page (`src/options/index.html?onboarding=true`).
-- **Message handler**: Responds to `getSystemPrompts` by returning the full `systemPrompts` object from `prompts.js`.
+- **Install handler**: On first install, clears any stale `readingLevel` from storage and opens the onboarding page (`src/options/index.html?onboarding=true`). Pre-warms the offscreen document on install/update so the first inference request isn't blocked by model loading.
+- **Offscreen document lifecycle**: Creates and manages the offscreen document (`src/offscreen/index.html`) that hosts the WebLLM engine. Uses `chrome.offscreen.hasDocument()` to check existence and `chrome.offscreen.createDocument()` to create on demand.
+- **LLM request routing**: Intercepts `llmInfer` messages from the content script and forwards them to the offscreen document via `chrome.runtime.sendMessage({ target: 'offscreen', ... })`.
+- **AI status relay**: Handles `checkAIStatus` by querying the offscreen document's engine status (`ready`, `loading`, `unavailable`).
+- **System prompt delivery**: Responds to `getSystemPrompts` by returning the full `systemPrompts` object from `prompts.js`.
 - **Command dispatcher**: Listens to `chrome.commands.onCommand` for `simplify-page`, `toggle-focus`, and `toggle-tts`, and forwards the corresponding `action` string to the active tab's content script.
 
 ### `src/background/prompts.js`
@@ -223,10 +243,10 @@ Exports a `systemPrompts` object with three top-level keys (`textClarity`, `focu
 
 The main content script. Key responsibilities:
 
-- **AI initialization** (`initAICapabilities`): Reads `readingLevel` and `optimizeFor` from `chrome.storage.sync`, selects the matching system prompt, queries `self.ai.languageModel.capabilities()` for default inference parameters, and creates a `languageModel` session.
+- **LLM delegation**: AI inference is no longer handled locally. The content script resolves the appropriate system prompt (from cached prompts fetched via the background worker) and sends `{ action: 'llmInfer', systemPrompt, userPrompt }` to the background, which routes it to the offscreen document. Includes a retry loop (up to 2 attempts) per chunk.
 - **Message routing**: A `chrome.runtime.onMessage` listener dispatches incoming actions (`simplify`, `chunk-start`, `focus-toggle`, `tts-play`, `tts-pause`, `tts-stop`, `bionic-toggle`, `theme-change`, `font-toggle`, `spacing-change`, etc.) to the appropriate sub-module.
-- **Theme application**: Applies `backgroundColor` and `textColor` directly to `document.body.style` based on the selected theme key.
-- **Spacing**: Applies `lineHeight`, `letterSpacing`, and `wordSpacing` to `document.body.style`.
+- **Theme application**: Applies `backgroundColor` and `textColor` via a scoped `<style>` element targeting text-bearing elements, preserving images, SVGs, and Elu's own injected UI.
+- **Spacing**: Applies `lineHeight`, `letterSpacing`, and `wordSpacing` via a dynamic `<style>` element on `document.head`.
 
 ### `src/content/smart-chunking.js`
 
@@ -273,6 +293,26 @@ See [Focus Mode](#focus-mode) above. Exported API:
 | Function | Description |
 |---|---|
 | `initGlossary()` | Attaches the `dblclick` event listener to `document`. Must be called once during content script initialization. |
+
+Glossary definitions are fetched via the same `llmInfer` pipeline as simplification (background → offscreen), using a dedicated system prompt that instructs the model to return a concise one-sentence definition.
+
+### `src/offscreen/index.js`
+
+The offscreen document script. Owns the WebLLM engine instance and manages its lifecycle:
+
+- **Engine initialization** (`initEngine`): Spawns a Web Worker at `assets/webllm-worker.js` and creates a `CreateWebWorkerMLCEngine` instance for the `Llama-3.2-1B-Instruct-q4f16_1-MLC` model. Broadcasts download/compile progress via `chrome.runtime.sendMessage({ action: 'modelProgress' })`. Auto-initialises on document load for faster first inference.
+- **Serial inference queue** (`queuedInference`): Ensures only one completion request runs at a time. Failures are swallowed at the queue level so one bad request doesn't block subsequent ones.
+- **Inference** (`runInference`): Creates a self-contained message history (`[system, user]`) per request — no conversation carry-over. Uses `temperature: 0.7` and `max_tokens: 2048`.
+
+| Message action | Description |
+|---|---|
+| `initEngine` | Ensures the WebLLM engine is loaded; responds `{ success: true }` |
+| `llmInfer` | Runs one inference turn; responds `{ success: true, result }` or `{ success: false, error }` |
+| `checkStatus` | Returns the current engine status: `ready`, `loading`, or `unavailable` |
+
+### `src/offscreen/webllm-worker.js`
+
+A thin Web Worker that instantiates `WebWorkerMLCEngineHandler` from `@mlc-ai/web-llm` and relays messages from the offscreen document. All WebGPU / WebAssembly inference work runs in this worker to keep the extension UI responsive.
 
 ### `src/common/models/chunk.js`
 
@@ -351,16 +391,27 @@ A batched, async logging utility. Collects log entries in memory and flushes the
 
 ## AI Integration
 
-Elu uses Chrome's built-in **Prompt API** (`window.ai.languageModel`), which provides access to Gemini Nano running on-device. No external API calls are made.
+Elu uses **[WebLLM](https://github.com/mlc-ai/web-llm)** to run **Llama-3.2-1B-Instruct-q4f16_1-MLC** entirely on-device via WebGPU. No external API calls are made. All inference runs inside a Chrome offscreen document with a dedicated Web Worker, keeping the extension UI fully responsive.
 
-**Session lifecycle:**
+**Inference lifecycle:**
 
-1. On popup open or simplification trigger, the content script calls `initAICapabilities()`.
-2. It fetches the user's `readingLevel` (1–5) and `optimizeFor` mode from `chrome.storage.sync`.
-3. It requests the system prompt table from the background worker via `{ action: 'getSystemPrompts' }`.
-4. It queries `self.ai.languageModel.capabilities()` for `defaultTemperature` and `defaultTopK`.
-5. It creates a session with `self.ai.languageModel.create({ temperature, topK, systemPrompt })`.
-6. Simplification requests are sent as user messages to the session. The response is parsed by `marked` and injected into the DOM.
+1. On extension install or update, the background service worker pre-creates the offscreen document, which immediately starts warming up the WebLLM engine (`CreateWebWorkerMLCEngine`).
+2. When the user triggers simplification, the content script resolves the appropriate system prompt by reading `simplificationLevel` (1–5) and `optimizeFor` mode from `chrome.storage.sync`, then fetching the prompt table from the background worker.
+3. The content script sends `{ action: 'llmInfer', systemPrompt, userPrompt }` to the background service worker.
+4. The background routes the request to the offscreen document via `chrome.runtime.sendMessage({ target: 'offscreen', ... })`.
+5. The offscreen document queues the request (serial inference queue) and calls `engine.chat.completions.create()` with `temperature: 0.7` and `max_tokens: 2048`. Each request uses a fresh `[system, user]` message array — no conversation carry-over.
+6. The result is returned to the content script, parsed by `marked`, and injected into the DOM.
+
+**Model details:**
+
+| Property | Value |
+|---|---|
+| Model | Llama-3.2-1B-Instruct-q4f16_1-MLC |
+| Quantization | 4-bit (q4f16_1) |
+| Runtime | WebLLM (`@mlc-ai/web-llm` ^0.2.81) |
+| Backend | WebGPU (falls back to WebAssembly) |
+| Inference location | Offscreen document → Web Worker |
+| Download size | ~800 MB (cached by the browser after first download) |
 
 **System prompt matrix:**
 
@@ -374,21 +425,24 @@ level 4:      basic words   |   short paragraphs  |   basic patterns
 level 5:      elementary    |   max structure     |   minimal vocabulary
 ```
 
-**Glossary definitions** use a separate, on-demand `languageModel` session created at the time of the double-click event.
+**Glossary definitions** use the same inference pipeline (background → offscreen) with a dedicated system prompt that instructs the model to return a concise one-sentence definition.
 
 ---
 
 ## Build System
 
-Elu uses **Vite 7** as the build tool. The build is configured for multi-entry Chrome extension output.
+Elu uses **Vite 7** as the build tool. The build is configured for multi-entry Chrome extension output with six entry points.
 
 ```js
 // vite.config.js (simplified)
+worker: { format: 'es' },        // Web Workers use ES module format for top-level await
 input: {
-    popup:      'src/popup/index.html',
-    options:    'src/options/index.html',
-    background: 'src/background/index.js',
-    content:    'src/content/index.js'
+    popup:            'src/popup/index.html',
+    options:          'src/options/index.html',
+    background:       'src/background/index.js',
+    content:          'src/content/index.js',
+    offscreen:        'src/offscreen/index.html',
+    'webllm-worker':  'src/offscreen/webllm-worker.js'
 }
 output: {
     entryFileNames: 'assets/[name].js',
@@ -398,7 +452,7 @@ output: {
 outDir: 'dist'
 ```
 
-The project uses ES Modules (`"type": "module"` in `package.json`). All four entry points are bundled as separate files to `dist/assets/`. The `content-loader.js` in `public/` is copied to `dist/` as-is and is responsible for dynamically importing the bundled content script at runtime.
+The project uses ES Modules (`"type": "module"` in `package.json`). All six entry points are bundled as separate files to `dist/assets/`. The `content-loader.js` in `public/` is copied to `dist/` as-is and is responsible for dynamically importing the bundled content script at runtime. The `offscreen` entry hosts the WebLLM engine, and the `webllm-worker` entry runs WebGPU inference in a dedicated Web Worker.
 
 **Dependencies:**
 
@@ -420,6 +474,17 @@ The extension uses **Manifest Version 3** with the following permissions:
 | `storage` | Persist user settings and reading progress via `chrome.storage.sync` |
 | `scripting` | Programmatically inject scripts into tabs when needed |
 | `tts` | Access Chrome's native TTS engine as a fallback |
+| `offscreen` | Create an offscreen document to host the WebLLM engine and Web Worker |
+
+**Content Security Policy:**
+
+```json
+"content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+}
+```
+
+The `wasm-unsafe-eval` directive is required for WebLLM's WebAssembly runtime.
 
 The background script runs as a **service worker** with `"type": "module"`, allowing ES module imports. The content script is loaded via a lightweight `content-loader.js` injected at `document_start`, which then imports the full bundled content module.
 
@@ -443,18 +508,12 @@ Shortcuts are defined in `manifest.json` under `commands` and dispatched by the 
 
 ### Prerequisites
 
-- **Google Chrome** Dev or Canary channel, version >= 128.0.6545.0
-- **Disk space**: Minimum 22 GB free (required to download the on-device Gemini Nano model)
-- **GPU**: A supported discrete or integrated GPU (required by the on-device model runtime)
+- **Google Chrome** version >= 113 (WebGPU support required; available in stable Chrome since May 2023)
+- **GPU**: A WebGPU-compatible discrete or integrated GPU. Check compatibility at `chrome://gpu/` — look for "WebGPU" in the Graphics Feature Status section.
+- **Disk space**: ~2 GB free for the Llama-3.2-1B-Instruct model weights (downloaded and cached by WebLLM on first use)
 - **Node.js** >= 18 and **npm** >= 9
 
-### Enabling the Prompt API
-
-The `window.ai.languageModel` API must be enabled in Chrome flags before AI features will function:
-
-1. Navigate to `chrome://flags/#optimization-guide-on-device-model` and set to **Enabled BypassPerfRequirement**.
-2. Navigate to `chrome://flags/#prompt-api-for-gemini-nano` and set to **Enabled**.
-3. Relaunch Chrome. The Gemini Nano model will download in the background on first use (this may take several minutes).
+> **Note:** No Chrome flags are required. Unlike the earlier Prompt API approach, WebLLM works out of the box on any Chrome version with WebGPU support. The model is downloaded and compiled automatically on first launch.
 
 ### Installation
 
@@ -506,8 +565,8 @@ The `window.ai.languageModel` API must be enabled in Chrome flags before AI feat
 All text processing, AI inference, and data storage occur entirely on the local device.
 
 - No page content, reading data, or user preferences are transmitted to any external server.
-- The Gemini Nano model runs inside Chrome's own sandboxed process via the Prompt API.
-- The `@mlc-ai/web-llm` dependency is bundled for potential local model support but does not make network requests during normal operation.
+- The Llama-3.2-1B model runs inside Chrome's offscreen document via WebLLM and WebGPU — all inference is on-device.
+- WebLLM downloads model weights from the MLC model hub on first launch. After the initial download, the model is cached locally and no further network requests are made during inference.
 - `chrome.storage.sync` is used for preferences; this syncs across the user's devices via their Chrome account but is never accessible to or transmitted by Elu.
 
 ---
