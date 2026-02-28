@@ -2,7 +2,8 @@ import { commonEnglishWords } from '../common/dictionary.js';
 
 let tooltipContainer = null;
 let activeTooltip = null;
-let session = null;
+// glossary no longer keeps a local AI session — inference goes through
+// the background → offscreen pipeline.
 
 export function initGlossary() {
     document.addEventListener('dblclick', handleDoubleClick);
@@ -131,26 +132,23 @@ function removeTooltip() {
 }
 
 async function getDefinition(word) {
-    if (!self.ai || !self.ai.languageModel) {
-        return "AI not supported in this browser.";
-    }
-    
-    if (!session) {
-        try {
-            session = await self.ai.languageModel.create({
-                systemPrompt: "You are a concise dictionary assistant. Define the word simply in one short sentence. Do not repeat the word definition prefix."
-            });
-        } catch (e) {
-            console.error("Failed to create AI session", e);
-            return "AI initialization failed.";
-        }
-    }
-    
+    const GLOSSARY_SYSTEM_PROMPT =
+        'You are a concise dictionary assistant. ' +
+        'Define the word simply in one short sentence. ' +
+        'Do not repeat the word definition prefix.';
+
     try {
-        const result = await session.prompt(`Define "${word}"`);
-        // Cleanup response if it's chatty
-        return `<span class="term">${word}</span>: ${result}`;
+        const response = await chrome.runtime.sendMessage({
+            action: 'llmInfer',
+            systemPrompt: GLOSSARY_SYSTEM_PROMPT,
+            userPrompt: `Define "${word}"`
+        });
+        if (!response?.success) {
+            throw new Error(response?.error || 'LLM inference failed');
+        }
+        return `<span class="term">${word}</span>: ${response.result}`;
     } catch (e) {
-        return "Definition failed.";
+        console.error('[Elu] Glossary inference error:', e);
+        return 'Definition failed.';
     }
 }

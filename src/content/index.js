@@ -10,9 +10,8 @@ import { getFocusConfig, DEFAULT_FOCUS_CONFIG } from '../common/models/focus-con
 import './content.css';
 import './chunking.css';
 
-let simplificationSession = null;
-let systemPrompt = null; // Store systemPrompt globally
-let loadedSystemPrompts = null; // Store all loaded prompts globally
+// WebLLM inference is now handled by the offscreen document via the
+// background service-worker.  No local AI session is needed here.
 
 // Theme definitions
 const themes = {
@@ -70,78 +69,38 @@ const themes = {
     },
 };
 
-// Initialize the AI capabilities
+// ─── Reading-level & system-prompt helpers ─────────────────────────────────
+
 async function getReadingLevel() {
     return new Promise((resolve) => {
         chrome.storage.sync.get(['readingLevel', 'simplificationLevel'], function (result) {
-            // First try to get the explicitly set simplification level
             if (result.simplificationLevel) {
-                console.log('Using explicit simplification level:', result.simplificationLevel);
                 resolve(result.simplificationLevel.toString());
                 return;
             }
-
-            // Fall back to reading level or default
-            let level = result.readingLevel ?
-                result.readingLevel.toString() :
-                (simplificationLevelsConfig.levels === 3 ? '3' : '3');
-
-            console.log('Retrieved reading level:', level);
+            const level = result.readingLevel ? result.readingLevel.toString() : '3';
             resolve(level);
         });
     });
 }
 
-async function initAICapabilities() {
-    console.log('Starting AI capabilities initialization...');
-    try {
-        if (!self.ai || !self.ai.languageModel) {
-            console.error('AI API is not available');
-            return { summarizer: null, simplificationSession: null };
-        }
-
-        // Load system prompts
-        loadedSystemPrompts = await loadSystemPrompts();
-        console.log('Loaded systemPrompts:', loadedSystemPrompts);
-
-        if (!loadedSystemPrompts) {
-            throw new Error('Failed to load system prompts.');
-        }
-
-        const readingLevel = await getReadingLevel();
-        console.log('User reading level:', readingLevel);
-
-        // Retrieve the optimization mode from storage
-        const optimizeFor = await new Promise((resolve) => {
-            chrome.storage.sync.get(['optimizeFor'], (result) => {
-                const mode = result.optimizeFor || 'textClarity';
-                console.log('Optimization mode:', mode);
-                resolve(mode);
-            });
+/**
+ * Fetches system prompts from the background, selects the one that matches
+ * the user's current optimizeFor + readingLevel settings, and returns it.
+ *
+ * @returns {Promise<string>}
+ */
+async function resolveSystemPrompt() {
+    const prompts = await loadSystemPrompts();
+    const readingLevel = await getReadingLevel();
+    const optimizeFor = await new Promise((resolve) => {
+        chrome.storage.sync.get(['optimizeFor'], (result) => {
+            resolve(result.optimizeFor || 'textClarity');
         });
-
-        // Select the appropriate system prompt and store globally
-        systemPrompt = loadedSystemPrompts[optimizeFor][readingLevel];
-        console.log('Selected systemPrompt:', systemPrompt);
-
-        if (!systemPrompt) {
-            throw new Error('System prompt is undefined. Check if the prompts are correctly loaded and user preferences are valid.');
-        }
-
-        const { defaultTemperature, defaultTopK } = await self.ai.languageModel.capabilities();
-        // Update existing promptSession without redeclaring
-        simplificationSession = await self.ai.languageModel.create({
-            temperature: defaultTemperature,
-            topK: defaultTopK,
-            systemPrompt: systemPrompt
-        });
-        console.log('Language Model initialized successfully');
-
-        return { simplificationSession };
-    } catch (error) {
-        console.error('Error initializing AI capabilities:', error);
-        throw error;
-    }
+    });
+    const prompt = prompts?.[optimizeFor]?.[readingLevel];
+    if (!prompt) throw new Error(`No system prompt found for ${optimizeFor} / level ${readingLevel}`);
+    return prompt;
 }
 
 // Listen for messages from popup
@@ -152,16 +111,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         switch (request.action) {
             case "simplify":
                 try {
-                    await ensureInitialized();
-                    if (!simplificationSession) {
-                        console.error('Prompt API not available - cannot simplify text');
-                        sendResponse({ success: false, error: 'Prompt API not available' });
-                        return;
-                    }
-
                     console.log('Finding main content element...');
-
-                    console.log('Prompt API status:', simplificationSession ? 'initialized' : 'not initialized');
 
                     // Try to find the main content using various selectors, including Straits Times specific ones
                     const mainContent = document.querySelector([
@@ -385,16 +335,19 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
                             while (attempts < maxAttempts) {
                                 try {
-                                    // Reinitialize the Prompt API before each attempt using initAICapabilities()
-                                    await initAICapabilities();
-
                                     // Log the prompts before sending
                                     logPrompt(chunkText);
 
-                                    const stream = await simplificationSession.promptStreaming(chunkText);
-                                    for await (const chunk of stream) {
-                                        simplifiedText = chunk.trim();
+                                    const currentSystemPrompt = await resolveSystemPrompt();
+                                    const llmResponse = await chrome.runtime.sendMessage({
+                                        action: 'llmInfer',
+                                        systemPrompt: currentSystemPrompt,
+                                        userPrompt: chunkText
+                                    });
+                                    if (!llmResponse?.success) {
+                                        throw new Error(llmResponse?.error || 'LLM inference failed');
                                     }
+                                    simplifiedText = llmResponse.result || '';
 
                                     // Log the result
                                     console.log('Simplified Result:', simplifiedText.substring(0, 200) + (simplifiedText.length > 200 ? '...' : ''));
@@ -754,18 +707,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
             case "checkAIStatus":
                 try {
-                    if (!self.ai || !self.ai.languageModel) {
-                        sendResponse({ status: 'unavailable', message: 'AI not supported in this browser' });
-                    } else {
-                        const capabilities = await self.ai.languageModel.capabilities();
-                        if (capabilities.available === 'readily') {
-                            sendResponse({ status: 'ready', message: 'AI model ready' });
-                        } else if (capabilities.available === 'after-download') {
-                            sendResponse({ status: 'downloading', message: 'AI model downloading…' });
-                        } else {
-                            sendResponse({ status: 'unavailable', message: 'AI model not available' });
-                        }
-                    }
+                    const aiStatus = await chrome.runtime.sendMessage({ action: 'checkAIStatus' });
+                    sendResponse(aiStatus);
                 } catch (err) {
                     sendResponse({ status: 'unavailable', message: err.message });
                 }
@@ -801,12 +744,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
 // Logging function for prompts
 function logPrompt(userPrompt) {
-    if (!systemPrompt) {
-        console.error('System Prompt is undefined.');
-    } else {
-        console.log('System Prompt:', systemPrompt);
-    }
-    console.log('User Prompt:', userPrompt.substring(0, 200) + (userPrompt.length > 200 ? '...' : ''));
+    console.log('[Elu] User Prompt:', userPrompt.substring(0, 200) + (userPrompt.length > 200 ? '...' : ''));
 }
 
 // Load system prompts from background script
@@ -831,8 +769,6 @@ async function loadSystemPrompts() {
     });
 }
 
-// Initialize AI capabilities when content script loads
-let initializationPromise = null;
 // Track feature states
 let fontEnabled = false;
 let hoverEnabled = false;
@@ -940,20 +876,7 @@ function hideOriginalText(event) {
     }
 }
 
-function ensureInitialized() {
-    if (!initializationPromise) {
-        console.log('Content script loaded - starting initialization');
-        initializationPromise = initAICapabilities().then(() => {
-            console.log('Content script setup complete with capabilities:', {
-                promptSessionAvailable: !!simplificationSession
-            });
-        }).catch(error => {
-            console.error('Failed to initialize AI capabilities:', error);
-            initializationPromise = null; // Allow retry on failure
-        });
-    }
-    return initializationPromise;
-}
+// ensureInitialized() removed — AI is now handled by the offscreen document.
 
 // Function to apply spacing adjustments
 function applySpacingAdjustments(lineSpacing, letterSpacing, wordSpacing) {
@@ -1051,8 +974,6 @@ function showEluNotification(message, icon = '✿') {
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
-    ensureInitialized();
-
     // Apply saved theme
     chrome.storage.sync.get(['selectedTheme'], function (result) {
         const selectedTheme = result.selectedTheme || 'default';

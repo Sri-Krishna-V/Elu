@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Elu – WebLLM Offscreen</title>
+  <script type="module" crossorigin src="/assets/offscreen.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/modulepreload-polyfill.js">
+  <link rel="modulepreload" crossorigin href="/assets/index.js">
+</head>
+<body>
+  <!-- This document runs entirely off-screen. It hosts the WebLLM engine
+       in a dedicated Web Worker so that WebGPU inference never blocks the
+       extension UI. The background service-worker routes all LLM requests
+       here via chrome.runtime.sendMessage({ target: 'offscreen', ... }). -->
+</body>
+</html>
