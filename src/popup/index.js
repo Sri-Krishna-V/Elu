@@ -273,35 +273,30 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    // ── AI Status Check ──
-    chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+    // ── AI Status Check ── (direct background call — no tab hop required)
+    (function checkAIStatus() {
         const dot = document.getElementById('aiStatusDot');
         const text = document.getElementById('aiStatusText');
         if (!dot || !text) return;
 
-        if (tabs[0] && /^https?:/.test(tabs[0].url)) {
-            chrome.tabs.sendMessage(tabs[0].id, { action: 'checkAIStatus' }, function (response) {
-                if (chrome.runtime.lastError || !response) {
-                    dot.className = 'ai-status-dot status-unavailable';
-                    text.textContent = 'AI status unknown';
-                    return;
-                }
-                if (response.status === 'ready') {
-                    dot.className = 'ai-status-dot status-ready';
-                    text.textContent = 'AI Model Ready';
-                } else if (response.status === 'downloading') {
-                    dot.className = 'ai-status-dot'; // yellow pulsing
-                    text.textContent = 'AI Model Downloading…';
-                } else {
-                    dot.className = 'ai-status-dot status-unavailable';
-                    text.textContent = response.message || 'AI Not Available';
-                }
-            });
-        } else {
-            dot.className = 'ai-status-dot status-unavailable';
-            text.textContent = 'Open a webpage first';
-        }
-    });
+        chrome.runtime.sendMessage({ action: 'checkAIStatus' }, function (response) {
+            if (chrome.runtime.lastError || !response) {
+                dot.className = 'ai-status-dot status-unavailable';
+                text.textContent = 'AI status unknown';
+                return;
+            }
+            if (response.status === 'ready') {
+                dot.className = 'ai-status-dot status-ready';
+                text.textContent = 'AI Model Ready';
+            } else if (response.status === 'downloading') {
+                dot.className = 'ai-status-dot'; // yellow pulsing
+                text.textContent = 'AI Model Downloading…';
+            } else {
+                dot.className = 'ai-status-dot status-unavailable';
+                text.textContent = response.message || 'AI Not Available';
+            }
+        });
+    })();
 
     // ── Reading Profiles ──
     const PROFILES = {
@@ -685,8 +680,24 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // Listen for TTS state updates and progress from content script
+    // Listen for runtime messages: TTS state, progress, model download
     chrome.runtime.onMessage.addListener((message) => {
+        // ── Model download / load progress from offscreen document ──
+        if (message.action === 'modelProgress') {
+            const dot = document.getElementById('aiStatusDot');
+            const text = document.getElementById('aiStatusText');
+            if (dot && text) {
+                const p = message.progress;
+                if (p && p.progress >= 1) {
+                    dot.className = 'ai-status-dot status-ready';
+                    text.textContent = 'AI Model Ready';
+                } else if (p) {
+                    const pct = Math.round((p.progress || 0) * 100);
+                    dot.className = 'ai-status-dot'; // yellow pulsing
+                    text.textContent = p.text || `Loading model… ${pct}%`;
+                }
+            }
+        }
         if (message.action === 'tts-state-change') {
             updateTTSControls(message.state);
         }

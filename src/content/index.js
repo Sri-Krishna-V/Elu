@@ -1,5 +1,4 @@
 import { marked } from 'marked';
-import { simplificationLevelsConfig } from '../common/config.js';
 import { logger } from '../common/logger.js';
 import { applyBionicReading, removeBionicReading } from './bionic.js';
 import { handleTTSAction, getTTSState } from './tts.js';
@@ -328,17 +327,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                                 wordCount: chunkText.split(/\s+/).length
                             });
 
-                            // Send the chunkText as the prompt with retries and API reinitialization
+                            // Resolve system prompt once before the retry loop.
+                            const currentSystemPrompt = await resolveSystemPrompt();
                             let simplifiedText = '';
                             let attempts = 0;
-                            const maxAttempts = 5;
+                            const maxAttempts = 2;
 
                             while (attempts < maxAttempts) {
                                 try {
-                                    // Log the prompts before sending
                                     logPrompt(chunkText);
 
-                                    const currentSystemPrompt = await resolveSystemPrompt();
                                     const llmResponse = await chrome.runtime.sendMessage({
                                         action: 'llmInfer',
                                         systemPrompt: currentSystemPrompt,
@@ -357,17 +355,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                                         break;
                                     }
 
-                                    console.warn(`Empty response from API on attempt ${attempts + 1} - retrying with new API session...`);
+                                    console.warn(`Empty response from LLM on attempt ${attempts + 1} — retrying…`);
                                 } catch (error) {
-                                    console.warn(`API error on attempt ${attempts + 1}:`, error);
+                                    console.warn(`LLM error on attempt ${attempts + 1}:`, error);
                                     if (attempts === maxAttempts - 1) {
-                                        throw error; // Rethrow on final attempt
+                                        throw error;
                                     }
                                 }
 
                                 attempts++;
-                                // Add a small delay between retries
-                                await new Promise(resolve => setTimeout(resolve, 500)); // Increased delay to 500ms
+                                await new Promise(resolve => setTimeout(resolve, 200));
                             }
 
                             if (!simplifiedText || simplifiedText.trim().length === 0) {
@@ -747,23 +744,21 @@ function logPrompt(userPrompt) {
     console.log('[Elu] User Prompt:', userPrompt.substring(0, 200) + (userPrompt.length > 200 ? '...' : ''));
 }
 
-// Load system prompts from background script
+// Module-level prompt cache — avoids a background round-trip on every chunk.
+let cachedPrompts = null;
+
+// Load system prompts from background script (cached after first call).
 async function loadSystemPrompts() {
-    console.log('Attempting to load system prompts from background script');
+    if (cachedPrompts) return cachedPrompts;
     return new Promise((resolve, reject) => {
         chrome.runtime.sendMessage({ action: 'getSystemPrompts' }, (response) => {
             if (chrome.runtime.lastError) {
-                console.error('Error sending message to background script:', chrome.runtime.lastError);
                 reject(chrome.runtime.lastError);
+            } else if (response && response.success) {
+                cachedPrompts = response.prompts;
+                resolve(cachedPrompts);
             } else {
-                console.log('Received response from background script:', response);
-                if (response && response.success) {
-                    console.log('Successfully loaded system prompts:', response.prompts);
-                    resolve(response.prompts);
-                } else {
-                    console.error('Error loading system prompts:', response.error);
-                    reject(new Error(response.error));
-                }
+                reject(new Error(response?.error ?? 'Failed to load system prompts'));
             }
         });
     });

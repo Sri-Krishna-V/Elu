@@ -17,19 +17,11 @@ const OFFSCREEN_HTML = 'src/offscreen/index.html';
 
 /**
  * Returns true if an offscreen document is currently alive.
+ * chrome.offscreen.hasDocument() is guaranteed present in Chrome 116+,
+ * which is the same minimum version that supports createDocument().
  */
-async function hasOffscreenDocument() {
-    // chrome.offscreen.hasDocument() is available in Chrome 116+.
-    if (chrome.offscreen?.hasDocument) {
-        return chrome.offscreen.hasDocument();
-    }
-    // Fallback: inspect all extension contexts.
-    const contexts = await chrome.runtime.getContexts({
-        contextTypes: ['OFFSCREEN_DOCUMENT']
-    });
-    return contexts.some((ctx) =>
-        ctx.documentUrl?.endsWith(OFFSCREEN_HTML)
-    );
+function hasOffscreenDocument() {
+    return chrome.offscreen.hasDocument();
 }
 
 /**

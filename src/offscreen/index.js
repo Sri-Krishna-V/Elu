@@ -72,10 +72,26 @@ async function initEngine() {
     return initPromise;
 }
 
+// ─── Serial inference queue ───────────────────────────────────────────────
+// Ensures only one completion request runs at a time, preventing engine
+// instability when multiple chunks or glossary lookups fire concurrently.
+let _inferenceQueue = Promise.resolve();
+
 /**
- * Run a single inference request.
- * Creates a fresh chat session each time so system prompts take effect
- * without carrying over prior conversation context.
+ * Schedule an inference request to run after any currently in-flight one.
+ * Safe to call from concurrent message handlers.
+ */
+function queuedInference(systemPrompt, userPrompt) {
+    const task = _inferenceQueue.then(() => runInference(systemPrompt, userPrompt));
+    // Swallow queue-chain errors so one failure doesn't block future requests.
+    _inferenceQueue = task.catch(() => {});
+    return task;
+}
+
+/**
+ * Run a single inference request against the engine.
+ * Each call uses a self-contained message history so system prompts always
+ * take effect without carrying over prior conversation context.
  *
  * @param {string} systemPrompt
  * @param {string} userPrompt
@@ -92,7 +108,7 @@ async function runInference(systemPrompt, userPrompt) {
     const reply = await e.chat.completions.create({
         messages,
         temperature: 0.7,
-        max_tokens: 1024,
+        max_tokens: 2048,
         stream: false
     });
 
@@ -119,7 +135,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
                 sendResponse({ success: false, error: 'systemPrompt and userPrompt are required' });
                 return false;
             }
-            runInference(systemPrompt, userPrompt)
+            queuedInference(systemPrompt, userPrompt)
                 .then((result) => sendResponse({ success: true, result }))
                 .catch((err) => sendResponse({ success: false, error: err.message }));
             return true; // async
