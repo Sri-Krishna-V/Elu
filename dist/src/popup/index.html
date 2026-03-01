@@ -39,10 +39,49 @@
             </header>
 
             <!-- ── Decorative Window Bar ── -->
-            <div class="window-bar">
+            <div class="window-bar" aria-hidden="true">
                 <span class="window-dot dot-red"></span>
                 <span class="window-dot dot-yellow"></span>
                 <span class="window-dot dot-green"></span>
+            </div>
+
+            <!-- ── AI Status Indicator ── -->
+            <div class="ai-status-bar" id="aiStatusBar" role="status" aria-live="polite">
+                <span class="ai-status-dot" id="aiStatusDot"></span>
+                <span class="ai-status-text" id="aiStatusText">Checking AI model…</span>
+            </div>
+
+            <!-- ── Live Region for Screen Reader Announcements ── -->
+            <div id="liveRegion" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+
+            <!-- ── Reading Profiles Quick Switcher ── -->
+            <div class="card profiles-card" id="profilesCard">
+                <div class="card-header">
+                    <span class="card-icon"><i class="fas fa-user-cog"></i></span>
+                    <span class="card-title">Quick Profile</span>
+                </div>
+                <div class="profile-buttons" role="radiogroup" aria-label="Reading profiles">
+                    <button class="profile-btn" data-profile="default" role="radio" aria-checked="true"
+                        title="Default settings">
+                        <i class="fas fa-font"></i>
+                        <span>Default</span>
+                    </button>
+                    <button class="profile-btn" data-profile="dyslexia" role="radio" aria-checked="false"
+                        title="OpenDyslexic font, cream theme, wide spacing">
+                        <i class="fas fa-book-reader"></i>
+                        <span>Dyslexia</span>
+                    </button>
+                    <button class="profile-btn" data-profile="adhd" role="radio" aria-checked="false"
+                        title="Dark mode, high simplification, chunk mode">
+                        <i class="fas fa-bolt"></i>
+                        <span>ADHD</span>
+                    </button>
+                    <button class="profile-btn" data-profile="lowvision" role="radio" aria-checked="false"
+                        title="High contrast theme, wider spacing">
+                        <i class="fas fa-eye"></i>
+                        <span>Low Vision</span>
+                    </button>
+                </div>
             </div>
 
             <!-- ── Page Info Card ── -->
@@ -51,7 +90,7 @@
                     <span class="card-icon"><i class="fas fa-file-alt"></i></span>
                     <span class="card-title">Current Page</span>
                 </div>
-                <span class="page-title-display" id="pageTitle">Loading page info...</span>
+                <span class="page-title-display" id="pageTitle">Loading page info…</span>
                 <div class="page-meta">
                     <span class="meta-tag" id="complexityTag">
                         <i class="fas fa-brain"></i>
@@ -88,10 +127,12 @@
                     </button>
                 </div>
 
-                <div class="button-row" id="simplificationButtonRow">
-                    <button class="simplification-button" data-level="1">Low</button>
-                    <button class="simplification-button selected" data-level="3">Mid</button>
-                    <button class="simplification-button" data-level="5">High</button>
+                <div class="button-row" id="simplificationButtonRow" role="radiogroup"
+                    aria-label="Simplification level">
+                    <button class="simplification-button" data-level="1" role="radio" aria-checked="false">Low</button>
+                    <button class="simplification-button selected" data-level="3" role="radio"
+                        aria-checked="true">Mid</button>
+                    <button class="simplification-button" data-level="5" role="radio" aria-checked="false">High</button>
                 </div>
 
                 <div id="simplificationGuide" class="simplification-guide">
@@ -115,7 +156,7 @@
                 </div>
 
                 <div class="dropdown-container">
-                    <select id="optimizeSelector">
+                    <select id="optimizeSelector" aria-label="Optimization mode">
                         <option value="textClarity" selected>Simplify Complex Ideas</option>
                         <option value="focusStructure">Better Visual Organization</option>
                         <option value="wordPattern">Easier Reading Flow</option>
@@ -148,12 +189,27 @@
                     </ul>
                 </div>
 
-                <!-- ── Simplify CTA ── -->
-                <button id="simplifyText" class="btn btn-primary btn-full">
-                    <i class="fa-solid fa-wand-magic-sparkles"></i>
-                    <span id="simplifyButtonText">Simplify Text</span>
-                    <span id="loader" class="loader" style="display: none;"></span>
-                </button>
+                <!-- ── Simplify CTA & Undo Row ── -->
+                <div class="simplify-actions">
+                    <button id="simplifyText" class="btn btn-primary btn-full">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i>
+                        <span id="simplifyButtonText">Simplify Text</span>
+                        <span id="loader" class="loader" style="display: none;"></span>
+                    </button>
+                    <button id="undoSimplify" class="btn btn-ghost btn-full" style="display: none;"
+                        aria-label="Undo simplification">
+                        <i class="fas fa-undo"></i>
+                        <span>Undo Simplification</span>
+                    </button>
+                </div>
+
+                <!-- ── Simplification Progress ── -->
+                <div id="simplifyProgress" class="simplify-progress" style="display: none;">
+                    <div class="progress-bar-track">
+                        <div class="progress-bar-fill" id="simplifyProgressFill" style="width: 0%"></div>
+                    </div>
+                    <span class="helper-text" id="simplifyProgressText">Simplifying chunk 1 of 1…</span>
+                </div>
             </div>
 
             <!-- ── Reading Tools Card ── -->
@@ -164,19 +220,48 @@
                 </div>
 
                 <!-- TTS Controls -->
-                <div class="tts-controls">
-                    <button id="ttsPlay" class="tts-btn tts-play" aria-label="Play" title="Read Aloud">
-                        <i class="fas fa-play"></i>
-                    </button>
-                    <button id="ttsPause" class="tts-btn" aria-label="Pause" title="Pause" style="display: none;">
-                        <i class="fas fa-pause"></i>
-                    </button>
-                    <button id="ttsResume" class="tts-btn" aria-label="Resume" title="Resume" style="display: none;">
-                        <i class="fas fa-play-circle"></i>
-                    </button>
-                    <button id="ttsStop" class="tts-btn tts-stop" aria-label="Stop" title="Stop Reading">
-                        <i class="fas fa-stop"></i>
-                    </button>
+                <div class="tts-section">
+                    <div class="tts-controls">
+                        <button id="ttsPlay" class="tts-btn tts-play" aria-label="Play" title="Read Aloud">
+                            <i class="fas fa-play"></i>
+                        </button>
+                        <button id="ttsPause" class="tts-btn" aria-label="Pause" title="Pause" style="display: none;">
+                            <i class="fas fa-pause"></i>
+                        </button>
+                        <button id="ttsResume" class="tts-btn" aria-label="Resume" title="Resume"
+                            style="display: none;">
+                            <i class="fas fa-play-circle"></i>
+                        </button>
+                        <button id="ttsStop" class="tts-btn tts-stop" aria-label="Stop" title="Stop Reading">
+                            <i class="fas fa-stop"></i>
+                        </button>
+                    </div>
+
+                    <!-- TTS Speed & Voice Controls -->
+                    <div class="tts-options">
+                        <div class="slider-container tts-speed-control">
+                            <label for="ttsSpeed">
+                                Speed
+                                <span class="slider-value" id="ttsSpeedValue">1.0×</span>
+                            </label>
+                            <input type="range" id="ttsSpeed" min="0.5" max="2.0" step="0.1" value="1.0"
+                                aria-label="Speech speed">
+                        </div>
+                        <div class="tts-voice-control">
+                            <label for="ttsVoice" class="tts-voice-label">Voice</label>
+                            <select id="ttsVoice" aria-label="Speech voice">
+                                <option value="">Default</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- TTS Progress -->
+                    <div id="ttsProgressBar" class="tts-progress" style="display: none;">
+                        <div class="progress-bar-track">
+                            <div class="progress-bar-fill" id="ttsProgressFill" style="width: 0%"></div>
+                        </div>
+                        <span class="helper-text" id="ttsProgressText">Reading…</span>
+                    </div>
                 </div>
 
                 <hr class="divider">
@@ -194,9 +279,14 @@
                 </div>
             </div>
 
-            <!-- ── Footer ── -->
+            <!-- ── Footer with Keyboard Shortcuts ── -->
             <div class="popup-footer">
                 <span>✿ elu v1.0 · accessibility for every mind</span>
+                <div class="shortcut-hints" aria-label="Keyboard shortcuts">
+                    <span class="shortcut-hint"><kbd>Alt</kbd>+<kbd>S</kbd> Simplify</span>
+                    <span class="shortcut-hint"><kbd>Alt</kbd>+<kbd>F</kbd> Focus</span>
+                    <span class="shortcut-hint"><kbd>Alt</kbd>+<kbd>R</kbd> Read</span>
+                </div>
             </div>
 
         </div>
@@ -222,7 +312,7 @@
             </header>
 
             <!-- ── Window Bar ── -->
-            <div class="window-bar">
+            <div class="window-bar" aria-hidden="true">
                 <span class="window-dot dot-red"></span>
                 <span class="window-dot dot-yellow"></span>
                 <span class="window-dot dot-green"></span>
@@ -236,17 +326,17 @@
                 </div>
 
                 <div class="toggle-container">
-                    <span class="toggle-label">OpenDyslexic Font</span>
+                    <span class="toggle-label" id="fontToggleLabel">OpenDyslexic Font</span>
                     <label class="toggle">
-                        <input type="checkbox" id="fontToggle">
+                        <input type="checkbox" id="fontToggle" aria-labelledby="fontToggleLabel">
                         <span class="slider round"></span>
                     </label>
                 </div>
 
                 <div class="toggle-container">
-                    <span class="toggle-label">Bionic Reading</span>
+                    <span class="toggle-label" id="bionicToggleLabel">Bionic Reading</span>
                     <label class="toggle">
-                        <input type="checkbox" id="focusModeToggle">
+                        <input type="checkbox" id="focusModeToggle" aria-labelledby="bionicToggleLabel">
                         <span class="slider round"></span>
                     </label>
                 </div>
@@ -259,12 +349,22 @@
                     <span class="card-title">Theme</span>
                 </div>
 
-                <div class="theme-buttons" id="themeButtons">
-                    <button class="theme-btn" data-theme="default">Default</button>
-                    <button class="theme-btn active" data-theme="creamPaper">Cream</button>
-                    <button class="theme-btn" data-theme="darkMode">Dark</button>
-                    <button class="theme-btn" data-theme="sepia">Sepia</button>
-                    <button class="theme-btn" data-theme="highContrast">Hi-Con</button>
+                <div class="theme-buttons" id="themeButtons" role="radiogroup" aria-label="Color theme">
+                    <button class="theme-btn" data-theme="default" role="radio" aria-checked="false">
+                        <span class="swatch"></span>Default
+                    </button>
+                    <button class="theme-btn active" data-theme="creamPaper" role="radio" aria-checked="true">
+                        <span class="swatch"></span>Cream
+                    </button>
+                    <button class="theme-btn" data-theme="darkMode" role="radio" aria-checked="false">
+                        <span class="swatch"></span>Dark
+                    </button>
+                    <button class="theme-btn" data-theme="sepia" role="radio" aria-checked="false">
+                        <span class="swatch"></span>Sepia
+                    </button>
+                    <button class="theme-btn" data-theme="highContrast" role="radio" aria-checked="false">
+                        <span class="swatch"></span>Hi-Con
+                    </button>
                 </div>
             </div>
 
@@ -297,6 +397,23 @@
                         <span class="slider-value" id="wordSpacingValue">4px</span>
                     </label>
                     <input type="range" id="wordSpacing" min="0" max="10" step="0.5" value="4">
+                </div>
+            </div>
+
+            <!-- ── AI Model Card ── -->
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-icon"><i class="fas fa-microchip"></i></span>
+                    <span class="card-title">AI Model</span>
+                </div>
+
+                <div class="slider-container" style="padding-bottom: 4px;">
+                    <label for="aiModelSelectSettings" style="margin-bottom: 8px; display: block;">Choose AI model:</label>
+                    <select id="aiModelSelectSettings" style="width: 100%; padding: 8px 10px; border: 1.5px solid var(--border-color, #ccc); border-radius: 8px; font-family: inherit; font-size: 12px; background: var(--bg-secondary, #fff); color: var(--text-primary, #000); cursor: pointer;">
+                        <option value="Qwen2.5-0.5B-Instruct-q4f16_1-MLC">Qwen 2.5 0.5B — Fastest, Very Low VRAM</option>
+                        <option value="SmolLM2-1.7B-Instruct-q4f16_1-MLC">SmolLM2 1.7B — Higher Quality, Moderate VRAM</option>
+                    </select>
+                    <p style="font-size: 10px; color: var(--text-secondary, #666); margin-top: 8px; line-height: 1.5;">Changing models reloads the AI engine. This may take a moment.</p>
                 </div>
             </div>
 

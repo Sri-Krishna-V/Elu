@@ -2,27 +2,23 @@ import { commonEnglishWords } from '../common/dictionary.js';
 
 let tooltipContainer = null;
 let activeTooltip = null;
-let session = null;
+
+const GLOSSARY_TIMEOUT_MS = 10000;
 
 export function initGlossary() {
     document.addEventListener('dblclick', handleDoubleClick);
-    // document.addEventListener('click', closeTooltip); // Close on click elsewhere?
 }
 
 async function handleDoubleClick(e) {
     const selection = window.getSelection();
     const word = selection.toString().trim();
     
-    // Basic validation
     if (!word || word.length > 40) return;
-    if (/\s/.test(word)) return; // Only single words for now
+    if (/\s/.test(word)) return;
     
     const lowerWord = word.toLowerCase();
-    
-    // Skip common words
     if (commonEnglishWords.has(lowerWord)) return;
     
-    // We have an interesting word.
     const range = selection.getRangeAt(0);
     const rect = range.getBoundingClientRect();
     const centerX = rect.left + (rect.width / 2) + window.scrollX;
@@ -46,8 +42,8 @@ function createTooltipContainer() {
     host.style.position = 'absolute';
     host.style.left = '0';
     host.style.top = '0';
-    host.style.zIndex = '2147483647'; // Max z-index
-    host.style.pointerEvents = 'none'; // Don't block clicks initially
+    host.style.zIndex = '2147483647';
+    host.style.pointerEvents = 'none';
     
     const shadow = host.attachShadow({ mode: 'open' });
     
@@ -94,7 +90,6 @@ function createTooltipContainer() {
     
     tooltipContainer = shadow;
     
-    // Close on outside click logic could go here or globally
     document.addEventListener('mousedown', (e) => {
         if (activeTooltip && !host.contains(e.target)) {
             removeTooltip();
@@ -106,7 +101,7 @@ function createTooltipContainer() {
 
 function showTooltip(x, y, content) {
     const shadow = createTooltipContainer();
-    removeTooltip(); // Clear existing
+    removeTooltip();
     
     const tooltip = document.createElement('div');
     tooltip.className = 'tooltip';
@@ -120,7 +115,7 @@ function showTooltip(x, y, content) {
 
 function updateTooltipContent(text) {
     if (!activeTooltip) return;
-    activeTooltip.innerHTML = text; // Allow minimal HTML if needed
+    activeTooltip.innerHTML = text;
 }
 
 function removeTooltip() {
@@ -130,27 +125,63 @@ function removeTooltip() {
     }
 }
 
-async function getDefinition(word) {
-    if (!self.ai || !self.ai.languageModel) {
-        return "AI not supported in this browser.";
-    }
-    
-    if (!session) {
+/**
+ * Sends a message to the background with retry logic for service worker restarts.
+ */
+async function sendMessageWithRetry(message, maxAttempts = 3) {
+    const delays = [500, 1000, 2000];
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
         try {
-            session = await self.ai.languageModel.create({
-                systemPrompt: "You are a concise dictionary assistant. Define the word simply in one short sentence. Do not repeat the word definition prefix."
-            });
-        } catch (e) {
-            console.error("Failed to create AI session", e);
-            return "AI initialization failed.";
+            const response = await chrome.runtime.sendMessage(message);
+            if (chrome.runtime.lastError) {
+                throw new Error(chrome.runtime.lastError.message);
+            }
+            return response;
+        } catch (err) {
+            const isDisconnect = /receiving end does not exist|disconnected/i.test(err.message);
+            if (!isDisconnect || attempt === maxAttempts - 1) throw err;
+            console.warn(`[Elu Glossary] Service worker disconnected (attempt ${attempt + 1}), retrying…`);
+            await new Promise(r => setTimeout(r, delays[Math.min(attempt, delays.length - 1)]));
         }
     }
-    
+}
+
+async function getDefinition(word) {
+    const GLOSSARY_SYSTEM_PROMPT =
+        'You are a concise dictionary assistant. ' +
+        'Define the word simply in one short sentence. ' +
+        'Do not repeat the word definition prefix.';
+
     try {
-        const result = await session.prompt(`Define "${word}"`);
-        // Cleanup response if it's chatty
+        const inferenceP = sendMessageWithRetry({
+            action: 'llmInfer',
+            systemPrompt: GLOSSARY_SYSTEM_PROMPT,
+            userPrompt: `Define "${word}"`
+        });
+
+        const timeoutP = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('timeout')), GLOSSARY_TIMEOUT_MS)
+        );
+
+        const response = await Promise.race([inferenceP, timeoutP]);
+
+        if (!response?.success) {
+            throw new Error(response?.error || 'LLM inference failed');
+        }
+
+        const result = response.result || '';
+
+        // Validate glossary output: should be a short sentence, not gibberish
+        if (result.length > 300 || result.split('\n').length > 3) {
+            return `<span class="term">${word}</span>: Definition unavailable (unexpected response).`;
+        }
+
         return `<span class="term">${word}</span>: ${result}`;
     } catch (e) {
-        return "Definition failed.";
+        console.error('[Elu] Glossary inference error:', e);
+        if (e.message === 'timeout') {
+            return 'AI is busy. Try again in a moment.';
+        }
+        return 'Definition failed.';
     }
 }

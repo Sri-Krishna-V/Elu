@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Elu – WebLLM Offscreen</title>
+</head>
+<body>
+  <!-- This document runs entirely off-screen. It hosts the WebLLM engine
+       in a dedicated Web Worker so that WebGPU inference never blocks the
+       extension UI. The background service-worker routes all LLM requests
+       here via chrome.runtime.sendMessage({ target: 'offscreen', ... }). -->
+  <script type="module" src="./index.js"></script>
+</body>
+</html>

@@ -1,142 +1,413 @@
-# Elu - AI-Powered Accessible Reading Assistant
+# Elu — AI-Powered Accessible Reading Assistant
 
 <div align="center">
   <img src="public/images/icon128.png" alt="Elu Logo" width="128" height="128" />
-  <p><em>Making the web accessible for every mind.</em></p>
+
+  <br/>
+  <strong>Making the web readable for every mind.</strong>
+  <br/><br/>
+
+  <a href="https://github.com/Sri-Krishna-V/Elu/blob/main/LICENSE">
+    <img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-7C3AED.svg" />
+  </a>
+  <a href="https://developer.chrome.com/docs/extensions/mv3/">
+    <img alt="Manifest V3" src="https://img.shields.io/badge/Chrome_Extension-MV3-0D9488.svg" />
+  </a>
+  <img alt="WebLLM" src="https://img.shields.io/badge/AI-WebLLM_WebGPU-2563EB.svg" />
+  <img alt="AMD Slingshot 2026" src="https://img.shields.io/badge/AMD_Slingshot-AI_for_Social_Good-D97706.svg" />
 </div>
 
-Elu (short for **Elucidate**) is a powerful Chrome extension designed to make web content accessible and digestible for everyone. Whether you have dyslexia, ADHD, or simply want a more focused reading experience, Elu adapts the web to your needs using on-device AI.
+---
 
-Powered by Google's **Gemini Nano**, Elu processes content entirely offline in your browser, ensuring your privacy while delivering intelligent text simplification, summarization, and cognitive support tools.
+> **AMD Slingshot 2026 Submission** — Theme: *AI for Social Good*
+> Category: Assistive tools for vision, speech, reading, and neurodiverse learners.
+
+Elu (short for *Elucidate*) is a Chrome extension that transforms any web article into an accessible reading experience — on-device, offline, and privacy-preserving. It runs a quantized large language model directly in the browser using **WebLLM** and **WebGPU**, eliminating the need for cloud APIs or user data transmission.
+
+Elu targets a wide spectrum of cognitive and sensory needs: **dyslexia**, **ADHD**, **low vision**, **language learners**, and anyone who benefits from a calmer, clearer reading environment.
 
 ---
 
-## 🌟 Key Features
+## Table of Contents
 
-### 🧠 Smart Chunking
-Break down long, overwhelming articles into bite-sized, manageable "chunks".
-- **Progress Tracking**: Visual progress bar and "Chunk X of Y" indicators.
-- **Read Time & Complexity**: Estimates reading time and complexity level for each section.
-- **Focus Controls**: Navigate with buttons or keyboard shortcuts, mark chunks as read, and bookmark key sections.
-
-### 🎯 Focus Mode
-eliminate distractions and immerse yourself in the content.
-- **Distraction-Free UI**: Dims irrelevant page elements to highlight the text.
-- **Bionic Reading Support**: Highlights the initial letters of words to guide the eye and improve reading speed/comprehension.
-
-### 🤖 AI-Powered Simplification
-Customize the complexity of text to match your reading level.
-- **3 Simplification Levels**: Low, Mid, High.
-- **Optimization Modes**:
-  - **Simplify Complex Ideas**: Breaks down difficult concepts.
-  - **Better Visual Organization**: Uses shorter sections and improved formatting.
-  - **Easier Reading Flow**: Optimizes sentence structure for smoother reading.
-
-### 🗣️ Text-to-Speech (TTS)
-Listen to your articles instead of reading them.
-- Integrated player with Play, Pause, Resume, and Stop controls directly in the extension popup.
-
-### 🎨 Visual Accessibility & Customization
-Tailor the reading environment to your visual preferences.
-- **OpenDyslexic Font**: Toggle the specialized font designed to mitigate some symptoms of dyslexia.
-- **Color Themes**: Choose from Default, Cream Paper, Dark Mode, Sepia, High Contrast, and more.
-- **Spacing Controls**: Fine-tune Line Spacing, Letter Spacing, and Word Spacing for maximum readability.
+- [The Problem](#the-problem)
+- [Solution Overview](#solution-overview)
+- [Architecture](#architecture)
+- [Use Cases](#use-cases)
+- [Feature Reference](#feature-reference)
+- [Accessibility Design Principles](#accessibility-design-principles)
+- [Technology Stack](#technology-stack)
+- [Getting Started](#getting-started)
+- [Keyboard Shortcuts](#keyboard-shortcuts)
+- [Privacy Guarantee](#privacy-guarantee)
+- [Contributing](#contributing)
+- [License](#license)
 
 ---
 
-## 🚀 Getting Started
+## The Problem
+
+Approximately **1 in 5 people** has a language-based learning difference such as dyslexia. An estimated **366 million** people worldwide live with ADHD. Countless others navigate the web with low vision, cognitive fatigue, or as non-native speakers. Yet the modern web is built with one reader in mind: a neurotypical adult with perfect vision.
+
+Dense paragraphs, distracting sidebars, autoplay videos, and complex vocabulary create invisible barriers for a significant fraction of the population. Existing assistive tools are either siloed, superficial, or rely on cloud processing that creates privacy risks.
+
+---
+
+## Solution Overview
+
+Elu intercepts the reading experience at the browser level and provides a layered set of interventions:
+
+| Layer | What Elu Does |
+|---|---|
+| **Language** | Rewrites content to 5 configurable reading levels using an on-device LLM |
+| **Cognition** | Breaks articles into 150-word chunks with progress tracking and bookmarks |
+| **Focus** | Dims distractions, blocks animations, and provides ambient sound assistance |
+| **Vision** | Applies 13 high-contrast colour themes, spacing controls, and OpenDyslexic font |
+| **Perception** | Bionic reading (bold-first-half rendering) to guide the eye efficiently |
+| **Audio** | Paragraph-by-paragraph text-to-speech with variable speed and voice selection |
+| **Comprehension** | Inline glossary via double-click word lookup |
+
+All processing occurs locally. No page content ever leaves the browser.
+
+---
+
+## Architecture
+
+```mermaid
+graph TD
+    UI["Browser UI<br/>Popup · Options · Onboarding"]
+    CS["Content Scripts<br/>Simplify · Chunk · Focus · TTS · Bionic · Glossary"]
+    BG["Background Service Worker<br/>Message Router · Prompt Library · Shortcuts"]
+    AI["Offscreen AI Engine<br/>WebLLM on WebGPU · Qwen2.5-0.5B"]
+    ST[("Chrome Storage<br/>Preferences · Reading Progress")]
+
+    UI -->|"trigger action"| CS
+    CS -->|"inference request"| BG
+    BG -->|"forward to model"| AI
+    AI -->|"simplified text"| BG
+    BG -->|"deliver result"| CS
+    UI <-->|"sync preferences"| ST
+    CS <-->|"read / write"| ST
+    BG <-->|"read / write"| ST
+
+    classDef ui fill:#7C3AED,stroke:#5B21B6,color:#fff
+    classDef content fill:#0D9488,stroke:#0F766E,color:#fff
+    classDef bg fill:#D97706,stroke:#B45309,color:#fff
+    classDef ai fill:#2563EB,stroke:#1D4ED8,color:#fff
+    classDef store fill:#374151,stroke:#1F2937,color:#fff
+
+    class UI ui
+    class CS content
+    class BG bg
+    class AI ai
+    class ST store
+
+```
+
+### Key Architectural Decisions
+
+- **Offscreen Document + Web Worker**: The WebLLM engine runs in a dedicated Web Worker inside Chrome's `offscreen` document, keeping WebGPU inference off the UI thread entirely and preventing extension page freezes.
+- **Background service-worker as router**: All LLM requests from the content scripts are routed through the background service worker, which manages offscreen document lifecycle, model selection, and exponential-backoff retries.
+- **Mozilla Readability for content extraction**: A shared `content-extractor.js` module uses `@mozilla/readability` with a CSS-selector fallback to reliably locate the main article body, independent of page structure.
+- **System prompt library**: Three prompt families (`textClarity`, `focusStructure`, `wordPattern`) each with five intensity levels (1–5) provide 15 distinct rewrite personalities delivered from `prompts.js` without duplicating logic in the content layer.
+- **`chrome.storage.sync` for settings**: All user preferences are synced across devices at the storage layer; no settings server is required.
+
+---
+
+## Use Cases
+
+```mermaid
+flowchart LR
+    U1(["Dyslexia Reader"])
+    U2(["ADHD Reader"])
+    U3(["Low Vision Reader"])
+    U4(["General Reader"])
+
+    subgraph LANG["AI Language"]
+        A["Text Simplification<br/>5 Levels · 3 Modes"]
+    end
+
+    subgraph READ["Reading Experience"]
+        B["Smart Chunking"]
+        C["Focus Mode"]
+    end
+
+    subgraph VISION["Visual Accessibility"]
+        D["Bionic Reading"]
+        E["Colour Themes and Font"]
+        F["Typography Controls"]
+    end
+
+    subgraph AUDIO["Audio and Comprehension"]
+        G["Text-to-Speech"]
+        H["Glossary Lookup"]
+    end
+
+    subgraph PERSONAL["Personalisation"]
+        I["Accessibility Profiles<br/>Onboarding · Shortcuts"]
+    end
+
+    U1 --> A
+    U1 --> D
+    U1 --> E
+    U1 --> F
+    U1 --> I
+    U2 --> A
+    U2 --> B
+    U2 --> C
+    U2 --> I
+    U3 --> E
+    U3 --> F
+    U3 --> G
+    U3 --> I
+    U4 --> A
+    U4 --> B
+    U4 --> G
+    U4 --> H
+
+    style U1 fill:#7C3AED,stroke:#5B21B6,color:#fff
+    style U2 fill:#0D9488,stroke:#0F766E,color:#fff
+    style U3 fill:#DC2626,stroke:#B91C1C,color:#fff
+    style U4 fill:#2563EB,stroke:#1D4ED8,color:#fff
+    style A fill:#EEF2FF,stroke:#6366F1,color:#1e1b4b
+    style B fill:#ECFDF5,stroke:#10B981,color:#065f46
+    style C fill:#ECFDF5,stroke:#10B981,color:#065f46
+    style D fill:#FDF4FF,stroke:#A855F7,color:#581c87
+    style E fill:#FDF4FF,stroke:#A855F7,color:#581c87
+    style F fill:#FDF4FF,stroke:#A855F7,color:#581c87
+    style G fill:#FFF7ED,stroke:#F97316,color:#7c2d12
+    style H fill:#FFF7ED,stroke:#F97316,color:#7c2d12
+    style I fill:#FEF9C3,stroke:#EAB308,color:#713f12
+```
+
+---
+
+## Feature Reference
+
+### AI Text Simplification
+
+Elu rewrites page content using a locally running quantized LLM. Three optimization modes address distinct cognitive profiles:
+
+| Mode | Target Profile | Behaviour |
+|---|---|---|
+| **Text Clarity** (`textClarity`) | General / low reading fluency | Shortens sentences, removes filler, preserves paragraph structure |
+| **Focus Structure** (`focusStructure`) | ADHD / attention challenges | Bolds key phrases, limits paragraphs to 1–3 sentences, adds scannable structure |
+| **Word Pattern** (`wordPattern`) | Dyslexia / language learners | Enforces Subject-Verb-Object order, replaces idioms, avoids passive voice |
+
+Each mode has **five intensity levels** (1 = light polish → 5 = 1st-grade rewrite), giving 15 distinct rewrite configurations. Levels are configurable globally (3-level compact mode) or with full granularity (5-level mode) via `config.js`.
+
+### Smart Chunking
+
+Long articles are segmented into **150-word chunks** (configurable range: 50–300 words). Each chunk is presented one at a time as a slide, with:
+
+- Visual progress bar and "Chunk X of Y" counter
+- Estimated read time per chunk
+- Per-chunk bookmark toggle
+- "Mark complete" action to track progress
+- Session progress persisted in `chrome.storage` by URL — reading position is restored on revisit
+
+### Focus Mode
+
+Focus Mode creates a distraction-free overlay on the current page:
+
+- Configurable dim level for non-article elements
+- Automatic hiding of ads, sidebars, comment sections, and related-content panels
+- Animation and autoplay video blocking
+- Optional ambient sound (brown noise, rain, cafe)
+- Built-in Pomodoro-style countdown timer
+- Toggle via popup or `Alt+F` keyboard shortcut
+
+### Bionic Reading
+
+A DOM tree-walker processes all visible text nodes and wraps the first half of each word in a `<b>` element with class `bionic-highlight`. This leverages the brain's ability to complete words from partial visual input, reducing cognitive load during scanning. The feature is fully reversible with `removeBionicReading()`.
+
+### Text-to-Speech
+
+The TTS engine uses the Web Speech Synthesis API for cross-platform compatibility:
+
+- Paragraph-level chunking for natural-sounding playback
+- Variable playback speed (`tts-set-speed`)
+- Voice selection from all system-installed voices (`tts-set-voice`)
+- Play, Pause, Resume, Stop controls exposed in the popup
+- Accessible via `Alt+R` keyboard shortcut
+
+### Inline Glossary
+
+A `dblclick` listener intercepts word selections across the page. Words present in a common-English dictionary are bypassed; uncommon or domain-specific terms trigger an API call to a dictionary service, with the definition displayed in a Shadow DOM tooltip that is visually non-intrusive and pointer-event isolated.
+
+### Visual Accessibility
+
+| Feature | Detail |
+|---|---|
+| **13 Colour Themes** | Default, Dark Mode, Sepia, Cream Paper, High Contrast (B/W, Y/K, K/Y), Low Blue Light, Soft Pastel Blue/Green, Grey Scale, Blue Light Filter |
+| **OpenDyslexic Font** | Bundled typeface designed to reduce letter-confusion errors common in dyslexia |
+| **Line Spacing** | Adjustable 1.0× – 3.0× |
+| **Letter Spacing** | Adjustable 0 – 10px |
+| **Word Spacing** | Adjustable 0 – 20px |
+
+### Onboarding Profiles
+
+On first install, a guided 3-step onboarding flow lets users self-identify their profile:
+
+| Profile | Pre-configured Settings |
+|---|---|
+| **Default** | Standard spacing, system font, default theme |
+| **Dyslexia** | OpenDyslexic font, Cream Paper theme, elevated line/letter/word spacing |
+| **ADHD** | Dark Mode theme, level-5 simplification, moderate spacing |
+| **Low Vision** | High Contrast theme, maximum spacing, elevated line height |
+
+Profiles are immediately editable and all settings remain individually adjustable after onboarding.
+
+---
+
+## Accessibility Design Principles
+
+Elu is designed with **inclusion-by-design** values:
+
+- **Screen reader compatibility**: Notifications and status updates use ARIA live regions (`announce()` helper) so screen readers surface state changes without visual focus interruption.
+- **Keyboard-first navigation**: All primary functions are operable without a mouse. Global shortcuts (`Alt+S`, `Alt+F`, `Alt+R`) work from anywhere in the browser.
+- **Contrast compliance**: High Contrast and High Contrast Alt themes meet WCAG 2.1 AA contrast ratios. Yellow-on-Black and Black-on-Yellow variants meet AAA for users with achromatopsia.
+- **Font legibility**: OpenDyslexic is bundled locally — no CDN dependency — ensuring it is available in offline environments.
+- **No motion by default**: Focus Mode can suppress CSS animations and autoplay media, respecting users with vestibular disorders.
+- **Persistent preferences**: All accessibility settings sync across Chrome profiles via `chrome.storage.sync`, removing the need to reconfigure on each session.
+- **Progressive enhancement**: All non-AI features (bionic reading, focus mode, TTS, themes, spacing) function without model initialisation. AI simplification degrades gracefully with a clear "WebGPU not supported" message.
+
+---
+
+## Technology Stack
+
+| Component | Technology |
+|---|---|
+| Extension platform | Chrome Extension Manifest V3 |
+| Build tool | Vite 7 |
+| On-device AI | [WebLLM](https://github.com/mlc-ai/web-llm) (`@mlc-ai/web-llm` 0.2.x) via WebGPU |
+| Default model | `Qwen2.5-0.5B-Instruct-q4f16_1-MLC` (quantized, ~400 MB) |
+| Content parsing | `@mozilla/readability` 0.6 |
+| Markdown rendering | `marked` 17 |
+| Speech | Web Speech Synthesis API |
+| Storage | `chrome.storage.sync` |
+| Fonts | OpenDyslexic (self-hosted) |
+
+The extension ships no backend. Inference is delegated to a **Web Worker** running inside a Chrome `offscreen` document, using **WebGPU** for hardware-accelerated matrix operations. The offscreen architecture prevents WebGPU workloads from blocking the extension's UI thread.
+
+---
+
+## Getting Started
 
 ### Prerequisites
 
-Elu relies on Chrome's built-in AI capabilities (Gemini Nano), which are currently available in Chrome Dev or Canary channels.
+| Requirement | Detail |
+|---|---|
+| Browser | Chrome 116 or later (stable, dev, or canary) |
+| GPU | Any modern discrete or integrated GPU with WebGPU support |
+| Disk | ~500 MB free space for the model cache |
+| OS | Windows, macOS, or Linux |
 
-1.  **Chrome Dev/Canary**: Version ≥ 128.0.6545.0.
-2.  **Storage**: Minimum 22 GB free disk space (to download the AI model).
-3.  **Hardware**: A GPU capable of running the model (most modern discrete or integrated GPUs).
+> Note: WebGPU support can be verified at `chrome://gpu`. Elu detects WebGPU availability at runtime and disables AI features gracefully on unsupported hardware while keeping all other accessibility tools fully functional.
 
 ### Installation
 
-1.  **Clone the Repository**:
-    ```bash
-    git clone https://github.com/Sri-Krishna-V/Elu.git
-    cd Elu
-    ```
+**1. Clone and build**
 
-2.  **Install Dependencies**:
-    ```bash
-    npm install
-    ```
+```bash
+git clone https://github.com/Sri-Krishna-V/Elu.git
+cd Elu
+npm install
+npm run build
+```
 
-3.  **Build the Extension**:
-    ```bash
-    npm run build
-    ```
-    *(Or `npm run dev` for development with watch mode)*
+For development with hot-reload:
 
-4.  **Load into Chrome**:
-    - Open `chrome://extensions/`.
-    - Enable **Developer mode** (toggle in top right).
-    - Click **Load unpacked**.
-    - Select the `dist` folder generated by the build.
+```bash
+npm run dev
+```
 
-### Enabling Gemini Nano
+**2. Load the extension**
 
-For the AI features to work, you must enable the on-device model flags:
+1. Open `chrome://extensions/`
+2. Enable **Developer mode** (toggle, top-right corner)
+3. Click **Load unpacked**
+4. Select the `dist/` folder produced by the build
 
-1.  Open Chrome and go to `chrome://flags/#optimization-guide-on-device-model`.
-    -   Select **Enabled BypassPerfRequirement**.
-2.  Go to `chrome://flags/#prompt-api-for-gemini-nano`.
-    -   Select **Enabled**.
-3.  **Relaunch Chrome**.
-    -   *Note: The model may take a few minutes to download after the first launch.*
+**3. Complete onboarding**
+
+The extension opens a guided onboarding page on first install. Select your accessibility profile and preferred AI model, then click **Finish**. The model will cache to disk on first use (one-time download).
 
 ---
 
-## 📖 How to Use
+## Keyboard Shortcuts
 
-1.  **Open Elu**: Click the Elu icon in your Chrome toolbar on any article or content-heavy page.
-2.  **Choose Your Mode**:
-    -   **Simplify**: Select a Level (Low/Mid/High) and Mode, then click "Simplify Text".
-    -   **Chunk Mode**: Click "Chunk Mode" to break the article into slides.
-    -   **Focus Mode**: Click "Focus Mode" to dim distractions.
-3.  **Customize**: Click the **Settings (Gear Icon)** to access:
-    -   OpenDyslexic Font toggle.
-    -   Theme selection (Dark, Sepia, etc.).
-    -   Spacing sliders.
-4.  **Listen**: Use the playback controls at the bottom of the popup to start Text-to-Speech.
+| Shortcut | Action |
+|---|---|
+| `Alt + S` | Simplify the current page |
+| `Alt + F` | Toggle Focus Mode |
+| `Alt + R` | Toggle Read Aloud (TTS) |
+
+Shortcuts can be remapped in Chrome at `chrome://extensions/shortcuts`.
 
 ---
 
-## 🔒 Privacy First
+## Privacy Guarantee
 
-Elu is built with a **Privacy-First** architecture.
--   **100% Offline**: All text processing happens locally on your device using Chrome's built-in Gemini Nano model.
--   **No Data Collection**: We do not collect, store, or transmit your reading data or personal information.
--   **No External APIs**: Unlike other AI extensions, your data never leaves your browser.
-
----
-
-## 🛠️ Built With
-
--   **React / Vanilla JS**: Core extension logic.
--   **Vite**: Build tool and bundler.
--   **Chrome Extension Manifest V3**: Modern extension architecture.
--   **Gemini Nano**: On-device AI model via Chrome's Prompt API.
+- All text processing and AI inference run **entirely on-device** using WebGPU.
+- No page content, reading history, or usage analytics are transmitted to any server.
+- No account or sign-in is required.
+- The extension only requests the minimum permissions required: `activeTab`, `storage`, `scripting`, `tts`, and `offscreen`.
+- The source code is fully open and auditable.
 
 ---
 
-## 🤝 Contributing
+## Project Structure
 
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-1.  Fork the project
-2.  Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3.  Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4.  Push to the branch (`git push origin feature/AmazingFeature`)
-5.  Open a Pull Request
+```
+src/
+  background/       # Service worker: routing, lifecycle, keyboard commands
+    index.js
+    prompts.js      # 15 system prompts (3 modes × 5 levels)
+  content/          # Injected into every page
+    index.js        # Central message handler and orchestrator
+    smart-chunking.js
+    focus-mode.js
+    bionic.js
+    tts.js
+    glossary.js
+  offscreen/        # WebLLM engine host (WebGPU, Web Worker)
+    index.js
+    webllm-worker.js
+  options/          # Onboarding and settings page
+  popup/            # Extension action popup
+  common/           # Shared utilities
+    content-extractor.js  # Readability + CSS selector extraction
+    config.js
+    logger.js
+    models/
+      chunk.js
+      focus-config.js
+```
 
 ---
 
-## 📄 License
+## Contributing
 
-Distributed under the MIT License. See `LICENSE` for more information.
+Contributions are welcome.
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/your-feature`
+3. Commit your changes: `git commit -m 'Add your feature'`
+4. Push to the branch: `git push origin feature/your-feature`
+5. Open a Pull Request
+
+Please ensure any new features maintain the extension's offline-first and privacy-first constraints.
+
+---
+
+## License
+
+Distributed under the MIT License. See [LICENSE](LICENSE) for details.
+
+---
+
+<div align="center">
+  Built for the AMD Slingshot 2026 Hackathon &mdash; AI for Social Good<br/>
+  <em>Accessible technology is not a feature. It is a right.</em>
+</div>

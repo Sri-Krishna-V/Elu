@@ -5,6 +5,7 @@
 
 import { createChunk, createProgress, getStoredProgress, saveProgress } from '../common/models/chunk.js';
 import { logger } from '../common/logger.js';
+import { extractArticleParagraphs, MAIN_CONTENT_SELECTORS } from '../common/content-extractor.js';
 
 let currentChunks = [];
 let currentProgress = null;
@@ -20,30 +21,14 @@ const CONFIG = {
 };
 
 /**
- * Main content selectors (reused from existing codebase)
- */
-const CONTENT_SELECTORS = [
-    'article',
-    '[role="main"]',
-    'main',
-    '.post-content',
-    '.article-content',
-    '.entry-content',
-    '.content-body',
-    '#content',
-    '.story-body',
-    '.article-body'
-].join(', ');
-
-/**
  * Initialize chunking for current page
  * @returns {Promise<{chunks: ContentChunk[], progress: ReadingProgress}>}
  */
 export async function initChunking() {
     logger.info('Initializing smart chunking...');
 
-    // Find main content
-    const mainContent = document.querySelector(CONTENT_SELECTORS);
+    // Use shared content extractor
+    const mainContent = document.querySelector(MAIN_CONTENT_SELECTORS);
     if (!mainContent) {
         logger.error('Could not find main content for chunking');
         return null;
