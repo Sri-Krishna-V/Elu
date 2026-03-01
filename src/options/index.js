@@ -74,7 +74,10 @@ function finishOnboarding() {
     }
 
     const profile = PROFILES[selectedProfile] || PROFILES.default;
-    chrome.storage.sync.set({ ...profile, onboardingComplete: true }, () => {
+    const modelSelect = document.getElementById('aiModelSelect');
+    const selectedModel = modelSelect ? modelSelect.value : 'Qwen2.5-0.5B-Instruct-q4f16_1-MLC';
+    
+    chrome.storage.sync.set({ ...profile, onboardingComplete: true, selectedModel }, () => {
         window.close();
     });
 }
@@ -93,4 +96,32 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.profile-card').forEach(card => {
         card.addEventListener('click', () => selectProfile(card.dataset.profile));
     });
+    
+    // Initialize model selector
+    const modelSelect = document.getElementById('aiModelSelect');
+    if (modelSelect) {
+        // Load saved model or default to Qwen
+        chrome.storage.sync.get(['selectedModel'], (result) => {
+            let model = result.selectedModel;
+            // Migrate from old Llama model to default Qwen
+            if (!model || model === 'Llama-3.2-1B-Instruct-q4f16_1-MLC') {
+                model = 'Qwen2.5-0.5B-Instruct-q4f16_1-MLC';
+                chrome.storage.sync.set({ selectedModel: model });
+            }
+            modelSelect.value = model;
+        });
+        
+        // Handle model changes
+        modelSelect.addEventListener('change', (e) => {
+            const newModel = e.target.value;
+            chrome.storage.sync.set({ selectedModel: newModel }, () => {
+                console.log('[Elu Options] Model changed to:', newModel);
+                // Notify background to reload engine
+                chrome.runtime.sendMessage({ 
+                    action: 'modelChanged', 
+                    model: newModel 
+                });
+            });
+        });
+    }
 });

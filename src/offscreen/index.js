@@ -2,12 +2,15 @@
  * Elu – Offscreen Document (src/offscreen/index.js)
  *
  * This script runs inside the chrome.offscreen document.  It owns the
- * WebLLM engine (Llama-3.2-1B-Instruct-q4f16_1-MLC) which runs inside a
- * dedicated Web Worker so WebGPU work never blocks the extension UI.
+ * WebLLM engine which runs inside a dedicated Web Worker so WebGPU work 
+ * never blocks the extension UI.
  *
  * Message protocol (from background service-worker):
  *   { target: 'offscreen', action: 'initEngine' }
  *     → ensures the engine is loaded; responds { success: true }
+ *
+ *   { target: 'offscreen', action: 'reloadEngine', model: string }
+ *     → unloads current engine and loads new model
  *
  *   { target: 'offscreen', action: 'llmInfer', systemPrompt, userPrompt }
  *     → runs one inference turn; responds { success: true, result: string }
@@ -22,24 +25,78 @@
 
 import { CreateWebWorkerMLCEngine } from '@mlc-ai/web-llm';
 
-const MODEL_ID = 'Llama-3.2-1B-Instruct-q4f16_1-MLC';
+const DEFAULT_MODEL = 'Qwen2.5-0.5B-Instruct-q4f16_1-MLC';
 
 /** @type {import('@mlc-ai/web-llm').MLCEngineInterface | null} */
 let engine = null;
+let currentModel = null;
 let engineStatus = 'unavailable'; // 'unavailable' | 'loading' | 'ready'
 let engineErrorReason = '';        // structured reason: 'no_webgpu' | 'init_failed' | ''
 let initPromise = null;
 
 const INIT_MAX_ATTEMPTS = 3;
 const INIT_BACKOFF_BASE_MS = 2000;
-const INFERENCE_TIMEOUT_MS = 30000;
+const INFERENCE_TIMEOUT_MS = 180000; // 180 seconds (3 minutes) for slower hardware
+
+/**
+ * Get the selected model from storage, with fallback to default
+ */
+async function getSelectedModel() {
+    return new Promise((resolve) => {
+        chrome.storage.sync.get(['selectedModel'], (result) => {
+            let model = result.selectedModel;
+            // Migrate from old Llama model or use default
+            if (!model || model === 'Llama-3.2-1B-Instruct-q4f16_1-MLC') {
+                model = DEFAULT_MODEL;
+                chrome.storage.sync.set({ selectedModel: model });
+            }
+            resolve(model);
+        });
+    });
+}
+
+/**
+ * Properly destroy the existing engine to free VRAM
+ */
+async function destroyEngine() {
+    if (!engine) return;
+    
+    try {
+        console.log('[Elu offscreen] Destroying existing engine...');
+        // Unload the model to free VRAM
+        await engine.unload();
+        engine = null;
+        currentModel = null;
+        engineStatus = 'unavailable';
+        console.log('[Elu offscreen] Engine destroyed successfully');
+    } catch (err) {
+        console.error('[Elu offscreen] Error destroying engine:', err);
+        // Force clear even if there's an error
+        engine = null;
+        currentModel = null;
+        engineStatus = 'unavailable';
+    }
+}
 
 /**
  * Initialise (or return the existing) WebLLM engine.
  * Checks for WebGPU support first, then retries with exponential backoff.
+ * 
+ * @param {string} forceModel - Optional model ID to force load (for reloading)
  */
-async function initEngine() {
-    if (engine && engineStatus === 'ready') return engine;
+async function initEngine(forceModel = null) {
+    const modelToLoad = forceModel || await getSelectedModel();
+    
+    // If we already have the right model loaded, return it
+    if (engine && engineStatus === 'ready' && currentModel === modelToLoad) {
+        return engine;
+    }
+    
+    // If we're loading a different model, destroy the old one first
+    if (engine && currentModel !== modelToLoad) {
+        await destroyEngine();
+    }
+    
     if (initPromise) return initPromise;
 
     // WebGPU feature detection
@@ -55,6 +112,9 @@ async function initEngine() {
 
     engineStatus = 'loading';
     engineErrorReason = '';
+    currentModel = modelToLoad;
+
+    console.log(`[Elu offscreen] Initializing model: ${modelToLoad}`);
 
     initPromise = (async () => {
         let lastError;
@@ -65,7 +125,7 @@ async function initEngine() {
                         chrome.runtime.getURL('assets/webllm-worker.js'),
                         { type: 'module' }
                     ),
-                    MODEL_ID,
+                    modelToLoad,
                     {
                         initProgressCallback: (progress) => {
                             chrome.runtime.sendMessage({
@@ -80,8 +140,9 @@ async function initEngine() {
                 engineErrorReason = '';
                 chrome.runtime.sendMessage({
                     action: 'modelProgress',
-                    progress: { progress: 1, timeElapsed: 0, text: 'Model ready' }
+                    progress: { progress: 1, timeElapsed: 0, text: `Model ready: ${modelToLoad}` }
                 }).catch(() => {});
+                console.log(`[Elu offscreen] Model loaded successfully: ${modelToLoad}`);
                 return engine;
             } catch (err) {
                 lastError = err;
@@ -99,6 +160,7 @@ async function initEngine() {
         }
         engineStatus = 'unavailable';
         engineErrorReason = 'init_failed';
+        currentModel = null;
         initPromise = null;
         chrome.runtime.sendMessage({
             action: 'modelProgress',
@@ -107,7 +169,9 @@ async function initEngine() {
         throw lastError;
     })();
 
-    return initPromise;
+    const result = await initPromise;
+    initPromise = null;
+    return result;
 }
 
 // ─── Serial inference queue ───────────────────────────────────────────────
@@ -143,6 +207,9 @@ function queuedInference(systemPrompt, userPrompt) {
 async function runInference(systemPrompt, userPrompt) {
     const e = await initEngine();
 
+    console.log('[Elu offscreen] Starting inference...');
+    const startTime = Date.now();
+
     const messages = [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt }
@@ -151,9 +218,12 @@ async function runInference(systemPrompt, userPrompt) {
     const reply = await e.chat.completions.create({
         messages,
         temperature: 0.7,
-        max_tokens: 2048,
+        max_tokens: 800, // Reduced from 2048 for faster generation
         stream: false
     });
+
+    const elapsed = Date.now() - startTime;
+    console.log(`[Elu offscreen] Inference completed in ${(elapsed / 1000).toFixed(2)}s`);
 
     return reply.choices[0]?.message?.content?.trim() ?? '';
 }
@@ -172,6 +242,27 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
             return true; // async
         }
 
+        case 'reloadEngine': {
+            const { model } = message;
+            if (!model) {
+                sendResponse({ success: false, error: 'Model ID is required' });
+                return false;
+            }
+            console.log(`[Elu offscreen] Reloading engine with model: ${model}`);
+            
+            (async () => {
+                try {
+                    await destroyEngine();
+                    await initEngine(model);
+                    sendResponse({ success: true });
+                } catch (err) {
+                    console.error('[Elu offscreen] Engine reload failed:', err);
+                    sendResponse({ success: false, error: err.message });
+                }
+            })();
+            return true; // async
+        }
+
         case 'llmInfer': {
             const { systemPrompt, userPrompt } = message;
             if (!systemPrompt || !userPrompt) {
@@ -185,7 +276,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         }
 
         case 'checkStatus': {
-            sendResponse({ success: true, status: engineStatus, errorReason: engineErrorReason });
+            sendResponse({ success: true, status: engineStatus, errorReason: engineErrorReason, model: currentModel });
             return false;
         }
 

@@ -754,7 +754,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 const pct = Math.round(((message.current + 1) / message.total) * 100);
                 if (simplifyProgress) simplifyProgress.style.display = 'block';
                 if (simplifyProgressFill) simplifyProgressFill.style.width = pct + '%';
-                if (simplifyProgressText) simplifyProgressText.textContent = `Simplifying chunk ${message.current + 1} of ${message.total}…`;
+                if (simplifyProgressText) {
+                    simplifyProgressText.textContent = `Simplifying chunk ${message.current + 1} of ${message.total}…`;
+                }
             }
         }
     });

@@ -539,6 +539,21 @@
             <div class="card">
                 <div class="confetti">🎉</div>
                 <h2>You're All Set!</h2>
+                
+                <!-- AI Model Selection -->
+                <div style="background: var(--accent-teal-light); border: 2px solid var(--outline); border-radius: var(--radius); padding: 20px; margin-bottom: 24px;">
+                    <h3 style="margin-bottom: 12px; font-size: 16px;">⚡ AI Model Selection</h3>
+                    <label for="aiModelSelect" style="display: block; margin-bottom: 8px; font-size: 13px; color: var(--text-secondary);">Choose your AI model:</label>
+                    <select id="aiModelSelect" style="width: 100%; padding: 10px; border: 2px solid var(--outline); border-radius: 8px; font-family: var(--font-mono); font-size: 13px; background: var(--white); margin-bottom: 8px;">
+                        <option value="Qwen2.5-0.5B-Instruct-q4f16_1-MLC">Qwen 2.5 0.5B (Fastest, Very Low VRAM)</option>
+                        <option value="SmolLM2-1.7B-Instruct-q4f16_1-MLC">SmolLM2 1.7B (High Quality, Moderate VRAM)</option>
+                    </select>
+                    <p style="font-size: 11px; color: var(--text-secondary); line-height: 1.5;">
+                        💡 <strong>Qwen 2.5:</strong> Fastest model, uses minimal VRAM. Great for older GPUs.<br>
+                        💎 <strong>SmolLM2:</strong> Higher quality responses, requires more VRAM and processing time.
+                    </p>
+                </div>
+                
                 <p>Here are some keyboard shortcuts to get you started quickly:</p>
                 <table class="shortcuts-table">
                     <tr>

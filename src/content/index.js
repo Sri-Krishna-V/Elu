@@ -109,6 +109,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         console.log("Received action:", request.action);
         switch (request.action) {
             case "simplify":
+                console.log('%c🚀 SIMPLIFY ACTION STARTED', 'background: #7B2CBF; color: white; font-size: 16px; padding: 8px; font-weight: bold;');
+                console.log('Current page URL:', window.location.href);
+                console.log('Document ready state:', document.readyState);
+                
                 if (isSimplifying) {
                     showEluNotification('Simplification already in progress…', '⏳');
                     sendResponse({ success: false, error: 'Simplification already in progress' });
@@ -308,11 +312,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                         simplifiedStyles.id = 'elu-simplified-styles';
                         simplifiedStyles.textContent = `
                             .simplified-text {
-                                padding-left: 5px;
-                                padding-right: 5px;
-                                margin: 10px 0;
-                                line-height: 1.6;
-                                font-weight: 400;
+                                /* Inherits page's default styling */
                             }
                             .original-text-tooltip {
                                 position: absolute;
@@ -326,20 +326,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                                 z-index: 10000;
                                 pointer-events: none;
                                 box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-                            }
-                            .simplified-text ul, .simplified-text ol {
-                                margin-left: 20px;
-                            }
-                            .simplified-text code {
-                                background: #f8f8f8;
-                                padding: 2px 4px;
-                                border-radius: 3px;
-                            }
-                            .simplified-text blockquote {
-                                border-left: 2px solid #ddd;
-                                margin-left: 0;
-                                padding-left: 10px;
-                                color: #666;
                             }
                         `;
                         document.head.appendChild(simplifiedStyles);
@@ -414,20 +400,20 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                                     console.log('Simplified Result:', simplifiedText.substring(0, 200) + (simplifiedText.length > 200 ? '...' : ''));
 
                                     if (simplifiedText && simplifiedText.trim().length > 0) {
-                                        console.log(`Successfully simplified text on attempt ${attempts + 1}`);
+                                        console.log(`✅ Successfully simplified text on attempt ${attempts + 1}`);
                                         break;
                                     }
 
                                     console.warn(`Empty response from LLM on attempt ${attempts + 1} — retrying…`);
                                 } catch (error) {
-                                    console.warn(`LLM error on attempt ${attempts + 1}:`, error);
+                                    console.warn(`❌ LLM error on attempt ${attempts + 1}:`, error.message);
                                     if (attempts === maxAttempts - 1) {
                                         throw error;
                                     }
                                 }
 
                                 attempts++;
-                                await new Promise(resolve => setTimeout(resolve, 500 * (attempts)));
+                                await new Promise(resolve => setTimeout(resolve, 1000 * attempts)); // Longer backoff
                             }
 
                             if (!simplifiedText || simplifiedText.trim().length === 0) {
@@ -523,7 +509,29 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                                 }
                                 // Keep original text for hover functionality
                                 newElement.setAttribute('data-original-text', p.textContent);
+                                
+                                // Verify parent exists before replacing
+                                if (!p.parentNode) {
+                                    console.error('❌ Cannot replace element - no parent node found!', p);
+                                    return;
+                                }
+                                
+                                console.log('✅ REPLACING DOM element:', {
+                                    originalElement: p,
+                                    newElement: newElement,
+                                    parentTag: p.parentNode.tagName,
+                                    isConnected: p.isConnected,
+                                    newText: newElement.textContent.substring(0, 100)
+                                });
+                                
                                 p.parentNode.replaceChild(newElement, p);
+                                
+                                // Verify replacement worked
+                                if (newElement.isConnected) {
+                                    console.log('%c✨ DOM REPLACEMENT SUCCESSFUL!', 'background: green; color: white; font-size: 14px; padding: 4px; font-weight: bold;');
+                                } else {
+                                    console.error('%c❌ DOM REPLACEMENT FAILED - element not connected!', 'background: red; color: white; font-size: 14px; padding: 4px; font-weight: bold;');
+                                }
 
                                 // Store reference to simplified elements
                                 simplifiedElements = simplifiedElements.filter(el => el !== p);
@@ -541,11 +549,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                                 });
 
                                 // Check if OpenDyslexic is enabled and apply it
-                                chrome.storage.sync.get('useOpenDyslexic', function (result) {
-                                    if (result.useOpenDyslexic) {
-                                        applyOpenDyslexicFont();
-                                    } else {
-                                        removeOpenDyslexicFont();
+                                chrome.storage.sync.get('fontEnabled', function (result) {
+                                    if (result.fontEnabled) {
+                                        toggleOpenDyslexicFont(true);
                                     }
                                 });
                             });

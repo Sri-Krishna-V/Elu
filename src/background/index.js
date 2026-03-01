@@ -34,8 +34,8 @@ async function ensureOffscreenDocument() {
         url: chrome.runtime.getURL(OFFSCREEN_HTML),
         reasons: ['WORKERS'],
         justification:
-            'WebLLM (Llama-3.2-1B-Instruct) inference runs in a Web Worker ' +
-            'inside the offscreen document using WebGPU.'
+            'WebLLM inference runs in a Web Worker inside the offscreen ' +
+            'document using WebGPU for on-device AI processing.'
     });
 }
 
@@ -153,6 +153,27 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 const result = await sendToOffscreen({ action: 'initEngine' });
                 sendResponse(result ?? { success: false, error: 'No response from offscreen' });
             } catch (err) {
+                sendResponse({ success: false, error: err.message });
+            }
+        })();
+        return true;
+    }
+
+    // ── Model change handler (triggered from options page) ──────────────────
+    if (request.action === 'modelChanged') {
+        (async () => {
+            try {
+                const { model } = request;
+                if (!model) {
+                    sendResponse({ success: false, error: 'Model ID is required' });
+                    return;
+                }
+                console.log('[Elu background] Model change requested:', model);
+                await ensureOffscreenDocument();
+                const result = await sendToOffscreen({ action: 'reloadEngine', model });
+                sendResponse(result ?? { success: false, error: 'No response from offscreen' });
+            } catch (err) {
+                console.error('[Elu background] Model change failed:', err);
                 sendResponse({ success: false, error: err.message });
             }
         })();
