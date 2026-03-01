@@ -2,6 +2,32 @@
 
 This guide covers prerequisites, building from source, loading the extension in Chrome, and first-run setup.
 
+```mermaid
+flowchart LR
+    A(["Clone repo"])
+    B["npm install"]
+    C["npm run build"]
+    D["dist/ folder"]
+    E["chrome://extensions\nEnable Developer mode"]
+    F["Load unpacked\nselect dist/"]
+    G["Onboarding page\nSelect profile + model"]
+    H["First Simplify request\nModel downloads once"]
+    I(["Fully operational"])
+
+    A --> B --> C --> D --> E --> F --> G --> H --> I
+
+    classDef step    fill:#0D9488,stroke:#0F766E,color:#fff
+    classDef chrome  fill:#2563EB,stroke:#1D4ED8,color:#fff
+    classDef ai      fill:#D97706,stroke:#B45309,color:#fff
+    classDef cap     fill:#7C3AED,stroke:#5B21B6,color:#fff
+
+    class A,B,C,D step
+    class E,F chrome
+    class G ai
+    class H ai
+    class I cap
+```
+
 ---
 
 ## Prerequisites

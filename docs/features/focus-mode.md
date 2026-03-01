@@ -15,6 +15,52 @@ Focus Mode creates a distraction-free reading environment by:
 4. Providing optional ambient sound.
 5. Optionally running a Pomodoro-style countdown timer.
 
+```mermaid
+flowchart TD
+    INACTIVE([Inactive])
+    ACTIVE([Active])
+
+    subgraph ACT["activateFocusMode(config)"]
+        A1["createFocusOverlay\ndimLevel applied"]
+        A2["blockAnimations + blockVideos\nif config flags set"]
+        A3["hideComments + hideSidebars\nhide ads, popups, related"]
+        A4{"ambientSound\nenabled?"}
+        A5["playAmbientSound\nbrown-noise / rain / cafe"]
+        A6{"timerEnabled?"}
+        A7["startTimer\nPomodoro countdown"]
+        A8(["Active state entered"])
+        A1 --> A2 --> A3 --> A4
+        A4 -- "Yes" --> A5 --> A6
+        A4 -- "No" --> A6
+        A6 -- "Yes" --> A7 --> A8
+        A6 -- "No" --> A8
+    end
+
+    subgraph DEACT["deactivateFocusMode()"]
+        D1["Remove overlay"]
+        D2["Remove timer widget"]
+        D3["Restore hidden elements\nfrom originalStyles map"]
+        D4["Stop audio + unblock animations"]
+        D5(["Inactive state entered"])
+        D1 --> D2 --> D3 --> D4 --> D5
+    end
+
+    INACTIVE -- "activateFocusMode" --> ACT
+    ACT --> ACTIVE
+    ACTIVE -- "deactivateFocusMode" --> DEACT
+    ACTIVE -- "updateFocusConfig" --> ACT
+
+    classDef state    fill:#7C3AED,stroke:#5B21B6,color:#fff
+    classDef process  fill:#0D9488,stroke:#0F766E,color:#fff
+    classDef decision fill:#374151,stroke:#1F2937,color:#fff
+    classDef done     fill:#D97706,stroke:#B45309,color:#fff
+
+    class INACTIVE,ACTIVE state
+    class A1,A2,A3,A5,A7,D1,D2,D3,D4 process
+    class A4,A6 decision
+    class A8,D5 done
+```
+
 ---
 
 ## Module State

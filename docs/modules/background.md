@@ -7,6 +7,44 @@
 
 ## Responsibilities
 
+```mermaid
+flowchart LR
+    POP["Popup"]
+    OPT["Options page"]
+    KB["Keyboard shortcut\nAlt+S / Alt+F / Alt+R"]
+    MSG{{"chrome.runtime\n.onMessage"}}
+    CMD{{"chrome.commands\n.onCommand"}}
+    H1["getSystemPrompts\nreturns prompt library"]
+    H2["llmInfer\ncalls ensureEngineReady\ncalls sendToOffscreen"]
+    H3["checkAIStatus\nqueries offscreen status"]
+    H4["modelProgress\nrebroadcasts to popup"]
+    H5["simplify / toggle-focus\ntoggle-tts to active tab"]
+    OFF["Offscreen Document"]
+    TAB["Content Script - tab"]
+
+    POP --> MSG
+    OPT --> MSG
+    MSG --> H1
+    MSG --> H2
+    MSG --> H3
+    MSG --> H4
+    H2 --> OFF
+    H3 --> OFF
+    KB --> CMD --> H5 --> TAB
+
+    classDef source   fill:#7C3AED,stroke:#5B21B6,color:#fff
+    classDef router   fill:#374151,stroke:#1F2937,color:#fff
+    classDef handler  fill:#D97706,stroke:#B45309,color:#fff
+    classDef target   fill:#2563EB,stroke:#1D4ED8,color:#fff
+    classDef content  fill:#0D9488,stroke:#0F766E,color:#fff
+
+    class POP,OPT,KB source
+    class MSG,CMD router
+    class H1,H2,H3,H4,H5 handler
+    class OFF target
+    class TAB content
+```
+
 | # | Concern | Code surface |
 |---|---|---|
 | 1 | First-install onboarding | `chrome.runtime.onInstalled` |

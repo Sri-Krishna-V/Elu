@@ -87,6 +87,44 @@ All 15 prompts share the same structural constraints:
 
 ## Simplification Pipeline
 
+```mermaid
+flowchart TD
+    A(["User triggers Simplify"])
+    B["resolveSystemPrompt()\nReads optimizeFor + level from storage"]
+    C["extractArticleParagraphs()\nReadability - CSS fallback - heuristic"]
+    D["Batch elements\n800-token limit per batch\nBreak at headings and lists"]
+    E["llmInfer via background\nsystemPrompt + userPrompt"]
+    F["Background routes to Offscreen\nWebLLM - WebGPU inference"]
+    G["Parse Markdown response\nwith marked"]
+    H["Replace DOM elements\nStore original in data-original-html"]
+    I{"More batches?"}
+    J(["Done"])
+
+    A --> B
+    A --> C
+    B --> D
+    C --> D
+    D --> E
+    E --> F
+    F --> G
+    G --> H
+    H --> I
+    I -- "Yes" --> E
+    I -- "No" --> J
+
+    classDef trigger  fill:#7C3AED,stroke:#5B21B6,color:#fff
+    classDef process  fill:#0D9488,stroke:#0F766E,color:#fff
+    classDef infere   fill:#2563EB,stroke:#1D4ED8,color:#fff
+    classDef dom      fill:#D97706,stroke:#B45309,color:#fff
+    classDef decision fill:#374151,stroke:#1F2937,color:#fff
+
+    class A,J trigger
+    class B,C,D,G process
+    class E,F infere
+    class H dom
+    class I decision
+```
+
 ### 1. Prompt Resolution
 
 ```js

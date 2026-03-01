@@ -36,6 +36,40 @@ A new chunk is started when:
 
 Words are counted as `text.trim().split(/\s+/).length`.
 
+```mermaid
+flowchart TD
+    A(["Article DOM elements"])
+    B["getContentElements()\nFilter: visible - length >= 10 - not nav/footer/aside"]
+    C["Next element"]
+    D{"Would exceed\nmaxWordsPerChunk\n(300)?"}
+    E{"Reached\ntargetWordsPerChunk\n(150)?"}
+    F["Flush current chunk\nStart new chunk"]
+    G["Add element to\ncurrent chunk"]
+    H{"More elements?"}
+    I["Flush final chunk"]
+    J(["ContentChunk[]"])
+
+    A --> B --> C --> D
+    D -- "Yes" --> F --> G --> H
+    D -- "No" --> G --> E
+    E -- "Yes" --> F
+    E -- "No" --> H
+    H -- "Yes" --> C
+    H -- "No" --> I --> J
+
+    classDef source   fill:#7C3AED,stroke:#5B21B6,color:#fff
+    classDef process  fill:#0D9488,stroke:#0F766E,color:#fff
+    classDef decision fill:#374151,stroke:#1F2937,color:#fff
+    classDef flush    fill:#D97706,stroke:#B45309,color:#fff
+    classDef output   fill:#2563EB,stroke:#1D4ED8,color:#fff
+
+    class A source
+    class B,G,I process
+    class D,E,H decision
+    class F flush
+    class J output
+```
+
 ---
 
 ## Exported Functions

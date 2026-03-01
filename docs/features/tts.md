@@ -49,6 +49,42 @@ Returns `{ isPlaying, isPaused, currentParagraphIndex, totalParagraphs }`.
 
 ## Playback Pipeline
 
+```mermaid
+flowchart TD
+    A(["tts-play received"])
+    B{"isPaused?"}
+    C["resumeReading()\nspeechSynthesis.resume()"]
+    D["startReading()\nextractArticleText()"]
+    E["Split into paragraphs\non double newlines\nfilter < 20 chars"]
+    F["speakParagraph(index)\nnew SpeechSynthesisUtterance"]
+    G["Apply rate + voice"]
+    H["speechSynthesis.speak()"]    
+    I["utterance.onend fires"]
+    J{"More paragraphs?"}
+    K["broadcastProgress()\ntts-progress to popup"]
+    L["stopReading()\nreset state"]
+    M(["Playback complete"])
+
+    A --> B
+    B -- "Yes" --> C
+    B -- "No" --> D --> E --> F
+    F --> G --> H --> I --> J
+    J -- "Yes" --> K --> F
+    J -- "No" --> L --> M
+
+    classDef trigger  fill:#7C3AED,stroke:#5B21B6,color:#fff
+    classDef process  fill:#0D9488,stroke:#0F766E,color:#fff
+    classDef decision fill:#374151,stroke:#1F2937,color:#fff
+    classDef speech   fill:#2563EB,stroke:#1D4ED8,color:#fff
+    classDef done     fill:#D97706,stroke:#B45309,color:#fff
+
+    class A trigger
+    class D,E,F,G,K process
+    class B,J decision
+    class C,H,I speech
+    class L,M done
+```
+
 ### `startReading()`
 
 1. Calls `extractArticleText()` to get the article as a plain-text string.

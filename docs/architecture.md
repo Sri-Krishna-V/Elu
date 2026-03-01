@@ -6,44 +6,52 @@ Elu is a Chrome Manifest V3 extension composed of four distinct execution contex
 
 ## Execution Contexts
 
-```
-┌─────────────────────────────────────────────────────────┐
-│  Browser UI                                             │
-│  ┌──────────────┐  ┌──────────────────────────────┐    │
-│  │  Popup       │  │  Options / Onboarding         │    │
-│  │  index.html  │  │  index.html?onboarding=true   │    │
-│  └──────┬───────┘  └──────────────┬───────────────┘    │
-│         │ chrome.runtime.sendMessage │                  │
-└─────────┼──────────────────────────┼───────────────────┘
-          │                          │
-┌─────────▼──────────────────────────▼───────────────────┐
-│  Background Service Worker  (src/background/index.js)   │
-│                                                         │
-│  • Install / update handler                             │
-│  • Offscreen document lifecycle (create / reuse)        │
-│  • Message router: popup → content & offscreen          │
-│  • Keyboard command dispatcher                          │
-│  • System-prompt library (prompts.js)                   │
-└─────────────────────────┬───────────────────────────────┘
-                          │ chrome.runtime.sendMessage
-          ┌───────────────┴──────────────────────┐
-          │                                      │
-┌─────────▼──────────────┐       ┌───────────────▼────────────────┐
-│  Content Scripts       │       │  Offscreen Document            │
-│  (src/content/)        │       │  (src/offscreen/index.html)    │
-│                        │       │                                │
-│  index.js              │       │  index.js                      │
-│  smart-chunking.js     │       │  └── spawns Web Worker         │
-│  focus-mode.js         │       │       webllm-worker.js         │
-│  bionic.js             │       │                                │
-│  tts.js                │       │  WebLLM / WebGPU inference      │
-│  glossary.js           │       │  Qwen2.5-0.5B-Instruct-q4f16_1│
-└────────────────────────┘       └────────────────────────────────┘
-          ↕                                      ↕
-┌──────────────────────────────────────────────────────────┐
-│  chrome.storage.sync                                     │
-│  Preferences · Reading Progress · Selected Model         │
-└──────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    subgraph UI["Browser UI"]
+        POP["Popup\nsrc/popup/index.html"]
+        OPT["Options - Onboarding\nsrc/options/index.html"]
+    end
+
+    BG["Background Service Worker\nsrc/background/index.js\nInstall handler - Offscreen lifecycle\nMessage router - Keyboard commands\nPrompt library"]
+
+    subgraph CONTENT["Content Scripts - src/content/"]
+        IDX["index.js\norchestrator"]
+        SC["smart-chunking.js"]
+        FM["focus-mode.js"]
+        BIO["bionic.js"]
+        TTS["tts.js"]
+        GL["glossary.js"]
+    end
+
+    subgraph OFFSCREEN["Offscreen Document - src/offscreen/"]
+        OI["index.js\nengine host"]
+        WW["webllm-worker.js\nWeb Worker"]
+        OI --> WW
+    end
+
+    ST[("chrome.storage.sync\nPreferences - Progress - Model")]
+
+    POP -- "sendMessage" --> BG
+    OPT -- "sendMessage" --> BG
+    BG -- "sendMessage to tab" --> IDX
+    BG -- "sendMessage to offscreen" --> OI
+    IDX <--> ST
+    BG <--> ST
+    OPT <--> ST
+    OI <--> ST
+
+    classDef ui        fill:#7C3AED,stroke:#5B21B6,color:#fff
+    classDef bg        fill:#D97706,stroke:#B45309,color:#fff
+    classDef content   fill:#0D9488,stroke:#0F766E,color:#fff
+    classDef offscreen fill:#2563EB,stroke:#1D4ED8,color:#fff
+    classDef store     fill:#374151,stroke:#1F2937,color:#fff
+
+    class POP,OPT ui
+    class BG bg
+    class IDX,SC,FM,BIO,TTS,GL content
+    class OI,WW offscreen
+    class ST store
 ```
 
 ---

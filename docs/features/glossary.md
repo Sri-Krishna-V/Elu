@@ -26,6 +26,44 @@ Attaches a single document-level listener. One listener handles all words on the
 
 ## `handleDoubleClick(e)`
 
+```mermaid
+flowchart TD
+    A(["User double-clicks a word"])
+    B["getSelection().toString().trim()"]
+    C{"Empty, over 40 chars,\nor contains space?"}
+    D{"Word in\ncommonEnglishWords?"}
+    E["Position tooltip below word\nShow loading state"]
+    F["getDefinition(word)\nFetch dictionaryapi.dev"]
+    G{"HTTP 200?"}
+    H["Parse phonetic +\ndefinitions + example"]
+    I["Update tooltip\nwith definition"]
+    J["Show error message\nin tooltip"]
+    K(["Tooltip visible\n(auto-dismiss after 10s)"])
+    L(["Silently ignored"])
+
+    A --> B --> C
+    C -- "Yes" --> L
+    C -- "No" --> D
+    D -- "Yes (common word)" --> L
+    D -- "No" --> E --> F --> G
+    G -- "200" --> H --> I --> K
+    G -- "404 / error" --> J --> K
+
+    classDef trigger  fill:#7C3AED,stroke:#5B21B6,color:#fff
+    classDef process  fill:#0D9488,stroke:#0F766E,color:#fff
+    classDef decision fill:#374151,stroke:#1F2937,color:#fff
+    classDef api      fill:#2563EB,stroke:#1D4ED8,color:#fff
+    classDef ui       fill:#D97706,stroke:#B45309,color:#fff
+    classDef skip     fill:#6B7280,stroke:#4B5563,color:#fff
+
+    class A trigger
+    class B,E,H,I,J process
+    class C,D,G decision
+    class F api
+    class K ui
+    class L skip
+```
+
 1. Reads `window.getSelection().toString().trim()`.
 2. Skips if empty, longer than 40 characters, or contains whitespace (multi-word selections).
 3. Lowercases and checks against `commonEnglishWords` set — skips common words silently.

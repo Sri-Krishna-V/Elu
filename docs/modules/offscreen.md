@@ -40,6 +40,51 @@ Calls `engine.unload()` to free VRAM, then clears `engine`, `currentModel`, and 
 
 #### `initEngine(forceModel?) → Promise<MLCEngineInterface>`
 
+```mermaid
+flowchart TD
+    A(["initEngine(forceModel?)"])
+    B{"Correct model\nalready ready?"}
+    C(["Return existing engine"])
+    D{"Different model\ncurrently loaded?"}
+    E["destroyEngine()\nFree VRAM"]
+    F{"initPromise\nalready running?"}
+    G(["Return initPromise"])
+    H{"navigator.gpu\npresent?"}
+    I["Set status: unavailable\nerrorReason: no_webgpu\nThrow"]
+    J["Set status: loading\nCreate Web Worker\nCreateWebWorkerMLCEngine"]
+    K["Broadcast download progress\nto popup via sendMessage"]
+    L{"Init succeeded?"}
+    M["Retry with exponential backoff\n2s - 4s - 8s, max 3 attempts"]
+    N["Set status: ready"]
+    O(["Return engine"])
+
+    A --> B
+    B -- "Yes" --> C
+    B -- "No" --> D
+    D -- "Yes" --> E --> F
+    D -- "No" --> F
+    F -- "Yes" --> G
+    F -- "No" --> H
+    H -- "No" --> I
+    H -- "Yes" --> J --> K --> L
+    L -- "No" --> M --> L
+    L -- "Yes" --> N --> O
+
+    classDef start    fill:#7C3AED,stroke:#5B21B6,color:#fff
+    classDef check    fill:#374151,stroke:#1F2937,color:#fff
+    classDef process  fill:#0D9488,stroke:#0F766E,color:#fff
+    classDef error    fill:#DC2626,stroke:#B91C1C,color:#fff
+    classDef infer    fill:#2563EB,stroke:#1D4ED8,color:#fff
+    classDef done     fill:#D97706,stroke:#B45309,color:#fff
+
+    class A start
+    class B,D,F,H,L check
+    class E,J,K,M,N process
+    class I error
+    class C,G done
+    class O infer
+```
+
 1. Returns immediately if the correct model is already loaded and ready.
 2. Calls `destroyEngine()` if a different model is currently loaded.
 3. Guards against re-entrant calls via `initPromise`.
