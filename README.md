@@ -19,6 +19,20 @@
 
 ---
 
+### Popup — Main Menu & Settings
+
+![Popup main menu with simplification controls, reading tools, and settings panel](docs/images/wireframes-main.png)
+
+### Onboarding Flow
+
+![Three-step onboarding — welcome, profile selection, and model/shortcut setup](docs/images/wireframes-onboarding.png)
+
+### Reading Experience
+
+![Webpage with Elu active — article extracted, chunked, and styled](docs/images/wireframe-webpage.jpeg)
+
+---
+
 > **AMD Slingshot 2026 Submission** — Theme: *AI for Social Good*
 > Category: Assistive tools for vision, speech, reading, and neurodiverse learners.
 
