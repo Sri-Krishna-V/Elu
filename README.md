@@ -4,7 +4,9 @@
   <img src="public/images/icon128.png" alt="Elu Logo" width="128" height="128" />
 
   <br/>
-  <strong>Making the web readable for every mind.</strong>
+  <strong>Making the web accessible for every mind.</strong>
+  <br/>
+  <em>AI-powered Chrome extension that makes any web article accessible — on-device LLM via WebGPU, zero cloud, zero backend.</em>
   <br/><br/>
 
   <a href="https://github.com/Sri-Krishna-V/Elu/blob/main/LICENSE">
@@ -15,6 +17,8 @@
   </a>
   <img alt="WebLLM" src="https://img.shields.io/badge/AI-WebLLM_WebGPU-2563EB.svg" />
   <img alt="AMD Slingshot 2026" src="https://img.shields.io/badge/AMD_Slingshot-AI_for_Social_Good-D97706.svg" />
+  <img alt="On-Device AI" src="https://img.shields.io/badge/On--Device_AI-Zero_Cloud-16A34A.svg" />
+  <img alt="Built for Dyslexia ADHD Low Vision" src="https://img.shields.io/badge/Built_for-Dyslexia_%7C_ADHD_%7C_Low_Vision-DC2626.svg" />
 </div>
 
 ---
@@ -22,9 +26,9 @@
 > **AMD Slingshot 2026 Submission** — Theme: *AI for Social Good*
 > Category: Assistive tools for vision, speech, reading, and neurodiverse learners.
 
-Elu (short for *Elucidate*) is a Chrome extension that transforms any web article into an accessible reading experience — on-device, offline, and privacy-preserving. It runs a quantized large language model directly in the browser using **WebLLM** and **WebGPU**, eliminating the need for cloud APIs or user data transmission.
+**Elu** (short for *Elucidate*) is a Chrome extension that transforms any web article into an accessible reading experience — on-device, offline, and privacy-preserving. It runs a quantized large language model directly in the browser using **WebLLM** and **WebGPU**, eliminating the need for cloud APIs or user data transmission.
 
-Elu targets a wide spectrum of cognitive and sensory needs: **dyslexia**, **ADHD**, **low vision**, **language learners**, and anyone who benefits from a calmer, clearer reading environment.
+Built for a wide spectrum of cognitive and sensory needs: **dyslexia**, **ADHD**, **low vision**, **language learners**, and anyone who benefits from a calmer, clearer reading environment. Every feature — AI simplification, smart chunking, focus mode, bionic reading, text-to-speech, and colour themes — works entirely on your device. Nothing is ever sent to a server.
 
 ---
 
