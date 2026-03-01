@@ -28,6 +28,16 @@ Elu targets a wide spectrum of cognitive and sensory needs: **dyslexia**, **ADHD
 
 ---
 
+### Popup — Main Menu & Settings
+
+![Wireframes: main popup menu with simplification controls, reading tools, and settings panel](docs/images/wireframes-main.png)
+
+### Onboarding Flow
+
+![Wireframes: three-step onboarding — welcome, profile selection, and model/shortcut setup](docs/images/wireframes-onboarding.png)
+
+---
+
 ## Table of Contents
 
 - [The Problem](#the-problem)
@@ -71,7 +81,6 @@ Elu intercepts the reading experience at the browser level and provides a layere
 
 All processing occurs locally. No page content ever leaves the browser.
 
-![AI Accessibility Reading System — Actors, system layers, and one-click intervention stack](docs/images/accessibility-system.png)
 
 ---
 
@@ -122,69 +131,7 @@ graph TD
 
 ## Use Cases
 
-```mermaid
-flowchart LR
-    U1(["Dyslexia Reader"])
-    U2(["ADHD Reader"])
-    U3(["Low Vision Reader"])
-    U4(["General Reader"])
-
-    subgraph LANG["AI Language"]
-        A["Text Simplification<br/>5 Levels · 3 Modes"]
-    end
-
-    subgraph READ["Reading Experience"]
-        B["Smart Chunking"]
-        C["Focus Mode"]
-    end
-
-    subgraph VISION["Visual Accessibility"]
-        D["Bionic Reading"]
-        E["Colour Themes and Font"]
-        F["Typography Controls"]
-    end
-
-    subgraph AUDIO["Audio and Comprehension"]
-        G["Text-to-Speech"]
-        H["Glossary Lookup"]
-    end
-
-    subgraph PERSONAL["Personalisation"]
-        I["Accessibility Profiles<br/>Onboarding · Shortcuts"]
-    end
-
-    U1 --> A
-    U1 --> D
-    U1 --> E
-    U1 --> F
-    U1 --> I
-    U2 --> A
-    U2 --> B
-    U2 --> C
-    U2 --> I
-    U3 --> E
-    U3 --> F
-    U3 --> G
-    U3 --> I
-    U4 --> A
-    U4 --> B
-    U4 --> G
-    U4 --> H
-
-    style U1 fill:#7C3AED,stroke:#5B21B6,color:#fff
-    style U2 fill:#0D9488,stroke:#0F766E,color:#fff
-    style U3 fill:#DC2626,stroke:#B91C1C,color:#fff
-    style U4 fill:#2563EB,stroke:#1D4ED8,color:#fff
-    style A fill:#EEF2FF,stroke:#6366F1,color:#1e1b4b
-    style B fill:#ECFDF5,stroke:#10B981,color:#065f46
-    style C fill:#ECFDF5,stroke:#10B981,color:#065f46
-    style D fill:#FDF4FF,stroke:#A855F7,color:#581c87
-    style E fill:#FDF4FF,stroke:#A855F7,color:#581c87
-    style F fill:#FDF4FF,stroke:#A855F7,color:#581c87
-    style G fill:#FFF7ED,stroke:#F97316,color:#7c2d12
-    style H fill:#FFF7ED,stroke:#F97316,color:#7c2d12
-    style I fill:#FEF9C3,stroke:#EAB308,color:#713f12
-```
+![AI Accessibility Reading System — Actors, system layers, and one-click intervention stack](docs/images/accessibility-system.png)
 
 ---
 
@@ -314,18 +261,6 @@ Elu is designed to run on AMD Radeon hardware using the RDNA architecture's WebG
 | **AMD Ryzen AI — Forward Path** | The same `@mlc-ai/web-llm` stack is positioned to route inference via WebNN to the AMD XDNA NPU, a natural hardware upgrade path for Elu |
 
 > Elu runs entirely offline. For users in low-connectivity environments, the AMD GPU in their existing device is the only compute available. By targeting WebGPU, Elu democratises on-device AI accessibility tools to anyone with AMD Radeon hardware — no cloud subscription, no data leakage, no ongoing cost.
-
----
-
-## Screenshots
-
-### Popup — Main Menu & Settings
-
-![Wireframes: main popup menu with simplification controls, reading tools, and settings panel](docs/images/wireframes-main.png)
-
-### Onboarding Flow
-
-![Wireframes: three-step onboarding — welcome, profile selection, and model/shortcut setup](docs/images/wireframes-onboarding.png)
 
 ---
 
