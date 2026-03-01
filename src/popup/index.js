@@ -277,7 +277,12 @@ document.addEventListener('DOMContentLoaded', function () {
     (function checkAIStatus() {
         const dot = document.getElementById('aiStatusDot');
         const text = document.getElementById('aiStatusText');
+        const statusBar = document.getElementById('aiStatusBar');
         if (!dot || !text) return;
+
+        // Remove any previous retry button
+        const oldRetry = statusBar?.querySelector('.ai-retry-btn');
+        if (oldRetry) oldRetry.remove();
 
         chrome.runtime.sendMessage({ action: 'checkAIStatus' }, function (response) {
             if (chrome.runtime.lastError || !response) {
@@ -294,6 +299,33 @@ document.addEventListener('DOMContentLoaded', function () {
             } else {
                 dot.className = 'ai-status-dot status-unavailable';
                 text.textContent = response.message || 'AI Not Available';
+
+                // Add retry button unless the issue is a hard WebGPU incompatibility
+                if (response.errorReason !== 'no_webgpu' && statusBar) {
+                    const retryBtn = document.createElement('button');
+                    retryBtn.className = 'ai-retry-btn';
+                    retryBtn.textContent = 'Retry';
+                    retryBtn.style.cssText = 'margin-left:8px;padding:2px 10px;border:1.5px solid #2b2b2b;border-radius:6px;background:#f5efe6;cursor:pointer;font-size:11px;font-weight:600;';
+                    retryBtn.addEventListener('click', function () {
+                        retryBtn.disabled = true;
+                        retryBtn.textContent = 'Retrying…';
+                        dot.className = 'ai-status-dot';
+                        text.textContent = 'Retrying model init…';
+                        chrome.runtime.sendMessage({ action: 'retryEngine' }, function (res) {
+                            if (res?.success) {
+                                dot.className = 'ai-status-dot status-ready';
+                                text.textContent = 'AI Model Ready';
+                                retryBtn.remove();
+                            } else {
+                                dot.className = 'ai-status-dot status-unavailable';
+                                text.textContent = res?.error || 'Retry failed';
+                                retryBtn.disabled = false;
+                                retryBtn.textContent = 'Retry';
+                            }
+                        });
+                    });
+                    statusBar.appendChild(retryBtn);
+                }
             }
         });
     })();

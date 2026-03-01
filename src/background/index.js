@@ -51,6 +51,21 @@ async function sendToOffscreen(payload) {
     return chrome.runtime.sendMessage({ target: 'offscreen', ...payload });
 }
 
+/**
+ * Ensures the offscreen document exists AND the engine is initialized.
+ * Handles the case where Chrome silently killed the offscreen document.
+ */
+async function ensureEngineReady() {
+    await ensureOffscreenDocument();
+    const status = await sendToOffscreen({ action: 'checkStatus' });
+    if (status?.status !== 'ready') {
+        const initResult = await sendToOffscreen({ action: 'initEngine' });
+        if (!initResult?.success) {
+            throw new Error(initResult?.error || 'Engine initialization failed');
+        }
+    }
+}
+
 // ─── Install handler ────────────────────────────────────────────────────────
 
 chrome.runtime.onInstalled.addListener(async (details) => {
@@ -89,6 +104,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                     sendResponse({ success: false, error: 'systemPrompt and userPrompt are required' });
                     return;
                 }
+                await ensureEngineReady();
                 const result = await sendToOffscreen({
                     action: 'llmInfer',
                     systemPrompt,
@@ -109,14 +125,35 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             try {
                 await ensureOffscreenDocument();
                 const result = await sendToOffscreen({ action: 'checkStatus' });
+                const errorReason = result?.errorReason || '';
                 const statusMap = {
                     ready: { status: 'ready', message: 'WebLLM model ready' },
                     loading: { status: 'downloading', message: 'WebLLM model loading…' },
-                    unavailable: { status: 'unavailable', message: 'WebLLM model unavailable' }
+                    unavailable: {
+                        status: 'unavailable',
+                        message: errorReason === 'no_webgpu'
+                            ? 'WebGPU not supported. Update Chrome or check GPU compatibility at chrome://gpu'
+                            : 'WebLLM model unavailable. Click Retry to try again.',
+                        errorReason
+                    }
                 };
                 sendResponse(statusMap[result?.status] ?? statusMap.unavailable);
             } catch (err) {
                 sendResponse({ status: 'unavailable', message: err.message });
+            }
+        })();
+        return true;
+    }
+
+    // ── Retry engine init (triggered from popup) ─────────────────────────────
+    if (request.action === 'retryEngine') {
+        (async () => {
+            try {
+                await ensureOffscreenDocument();
+                const result = await sendToOffscreen({ action: 'initEngine' });
+                sendResponse(result ?? { success: false, error: 'No response from offscreen' });
+            } catch (err) {
+                sendResponse({ success: false, error: err.message });
             }
         })();
         return true;

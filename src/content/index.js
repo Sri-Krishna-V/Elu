@@ -109,6 +109,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         console.log("Received action:", request.action);
         switch (request.action) {
             case "simplify":
+                if (isSimplifying) {
+                    showEluNotification('Simplification already in progress…', '⏳');
+                    sendResponse({ success: false, error: 'Simplification already in progress' });
+                    break;
+                }
+                isSimplifying = true;
                 try {
                     console.log('Finding main content element...');
 
@@ -167,7 +173,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
                     if (!mainContent) {
                         console.error('Could not find main content element');
-                        return;
+                        showEluNotification('No article content detected on this page', '⚠');
+                        sendResponse({ success: false, error: 'No readable content found on this page' });
+                        break;
                     }
 
                     // Restore original content if previously simplified
@@ -245,6 +253,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
                     console.log(`Found ${contentElements.length} content elements to process`);
 
+                    if (contentElements.length === 0) {
+                        showEluNotification('No article content detected on this page', '⚠');
+                        sendResponse({ success: false, error: 'No readable paragraphs found on this page' });
+                        break;
+                    }
+
                     // Helper function to check if element is a list
                     const isList = (element) => {
                         return ['UL', 'OL', 'DL'].includes(element.tagName);
@@ -281,6 +295,55 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                     }
 
                     console.log(`Grouped content into ${chunks.length} chunks`);
+
+                    if (chunks.length === 0) {
+                        showEluNotification('No article content detected on this page', '⚠');
+                        sendResponse({ success: false, error: 'No content chunks could be created' });
+                        break;
+                    }
+
+                    // Inject simplified-text styles once (not per paragraph)
+                    if (!document.getElementById('elu-simplified-styles')) {
+                        const simplifiedStyles = document.createElement('style');
+                        simplifiedStyles.id = 'elu-simplified-styles';
+                        simplifiedStyles.textContent = `
+                            .simplified-text {
+                                padding-left: 5px;
+                                padding-right: 5px;
+                                margin: 10px 0;
+                                line-height: 1.6;
+                                font-weight: 400;
+                            }
+                            .original-text-tooltip {
+                                position: absolute;
+                                max-width: 400px;
+                                background-color: rgba(0, 0, 0, 0.8);
+                                color: white;
+                                padding: 10px;
+                                border-radius: 5px;
+                                font-size: 14px;
+                                line-height: 1.4;
+                                z-index: 10000;
+                                pointer-events: none;
+                                box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+                            }
+                            .simplified-text ul, .simplified-text ol {
+                                margin-left: 20px;
+                            }
+                            .simplified-text code {
+                                background: #f8f8f8;
+                                padding: 2px 4px;
+                                border-radius: 3px;
+                            }
+                            .simplified-text blockquote {
+                                border-left: 2px solid #ddd;
+                                margin-left: 0;
+                                padding-left: 10px;
+                                color: #666;
+                            }
+                        `;
+                        document.head.appendChild(simplifiedStyles);
+                    }
 
                     // Process each chunk
                     let chunkIndex = 0;
@@ -331,13 +394,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                             const currentSystemPrompt = await resolveSystemPrompt();
                             let simplifiedText = '';
                             let attempts = 0;
-                            const maxAttempts = 2;
+                            const maxAttempts = 3;
 
                             while (attempts < maxAttempts) {
                                 try {
                                     logPrompt(chunkText);
 
-                                    const llmResponse = await chrome.runtime.sendMessage({
+                                    const llmResponse = await sendMessageWithRetry({
                                         action: 'llmInfer',
                                         systemPrompt: currentSystemPrompt,
                                         userPrompt: chunkText
@@ -364,11 +427,19 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                                 }
 
                                 attempts++;
-                                await new Promise(resolve => setTimeout(resolve, 200));
+                                await new Promise(resolve => setTimeout(resolve, 500 * (attempts)));
                             }
 
                             if (!simplifiedText || simplifiedText.trim().length === 0) {
                                 console.warn('Failed to get valid response after all attempts - keeping original text');
+                                continue;
+                            }
+
+                            // Sanitize and validate AI output
+                            simplifiedText = sanitizeAIOutput(simplifiedText);
+                            const validationError = validateSimplifiedOutput(chunkText, simplifiedText);
+                            if (validationError) {
+                                console.warn(`AI output failed validation (${validationError}) — keeping original text`);
                                 continue;
                             }
 
@@ -391,13 +462,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                                 if (simplifiedParagraphs.length > originalParagraphs.length) {
                                     simplifiedParagraphs.length = originalParagraphs.length;
                                 }
-                                // If we got fewer simplified paragraphs, remove extra original paragraphs
+                                // If we got fewer simplified paragraphs, hide (don't remove) the extras so undo can restore them
                                 if (simplifiedParagraphs.length < originalParagraphs.length) {
-                                    // Remove the extra original paragraphs from the DOM
                                     for (let i = simplifiedParagraphs.length; i < originalParagraphs.length; i++) {
-                                        originalParagraphs[i].remove();
+                                        originalParagraphs[i].setAttribute('data-original-html', originalParagraphs[i].outerHTML);
+                                        originalParagraphs[i].setAttribute('data-elu-hidden', 'true');
+                                        originalParagraphs[i].style.display = 'none';
                                     }
-                                    // Update the array to match simplified length
                                     originalParagraphs.length = simplifiedParagraphs.length;
                                 }
                             }
@@ -434,7 +505,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                                     // Handle regular paragraphs
                                     newElement = document.createElement('p');
                                     // Use marked to parse markdown
-                                    newElement.innerHTML = marked.parse(simplifiedParagraphs[index], {
+                                    newElement.innerHTML = marked.parse(sanitizeAIOutput(simplifiedParagraphs[index]), {
                                         breaks: true,
                                         gfm: true,
                                         headerIds: false,
@@ -442,45 +513,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                                     });
                                 }
 
-                                // Add styles for simplified text
-                                const simplifiedStyles = document.createElement('style');
-                                simplifiedStyles.textContent = `
-                                .simplified-text {
-                                    padding-left: 5px;
-                                    padding-right: 5px;
-                                    margin: 10px 0;
-                                    line-height: 1.6;
-                                    font-weight: 400;
-                                }
-                                .original-text-tooltip {
-                                    position: absolute;
-                                    max-width: 400px;
-                                    background-color: rgba(0, 0, 0, 0.8);
-                                    color: white;
-                                    padding: 10px;
-                                    border-radius: 5px;
-                                    font-size: 14px;
-                                    line-height: 1.4;
-                                    z-index: 10000;
-                                    pointer-events: none;
-                                    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-                                }
-                                .simplified-text ul, .simplified-text ol {
-                                    margin-left: 20px;
-                                }
-                                .simplified-text code {
-                                    background: #f8f8f8;
-                                    padding: 2px 4px;
-                                    border-radius: 3px;
-                                }
-                                .simplified-text blockquote {
-                                    border-left: 2px solid #ddd;
-                                    margin-left: 0;
-                                    padding-left: 10px;
-                                    color: #666;
-                                }
-                            `;
-                                document.head.appendChild(simplifiedStyles);
                                 newElement.classList.add('simplified-text');
                                 // Store the original HTML content if it's not already stored
                                 if (!p.hasAttribute('data-original-html')) {
@@ -534,6 +566,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 } catch (error) {
                     console.error('Error simplifying content:', error);
                     sendResponse({ success: false, error: error.message });
+                } finally {
+                    isSimplifying = false;
                 }
                 break;
 
@@ -713,9 +747,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
             case "undoSimplify":
                 try {
-                    const mainContent = document.querySelector('main, article, .content, .post, #content, #main, div[role="main"]');
-                    if (mainContent) {
-                        const simplified = mainContent.querySelectorAll('[data-original-html]');
+                    const undoContent = document.querySelector('main, article, .content, .post, #content, #main, div[role="main"]');
+                    if (undoContent) {
+                        // Restore replaced elements
+                        const simplified = undoContent.querySelectorAll('[data-original-html]:not([data-elu-hidden])');
                         simplified.forEach(el => {
                             const originalHTML = el.getAttribute('data-original-html');
                             const tempDiv = document.createElement('div');
@@ -723,8 +758,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                             const originalElement = tempDiv.firstChild;
                             el.parentNode.replaceChild(originalElement, el);
                         });
+                        // Restore hidden elements (from paragraph count mismatch)
+                        const hidden = undoContent.querySelectorAll('[data-elu-hidden]');
+                        hidden.forEach(el => {
+                            el.style.display = '';
+                            el.removeAttribute('data-elu-hidden');
+                            el.removeAttribute('data-original-html');
+                        });
                         showEluNotification('Original text restored ✓');
-                        sendResponse({ success: true, restored: simplified.length });
+                        sendResponse({ success: true, restored: simplified.length + hidden.length });
                     } else {
                         sendResponse({ success: false, error: 'No content found' });
                     }
@@ -742,6 +784,97 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 // Logging function for prompts
 function logPrompt(userPrompt) {
     console.log('[Elu] User Prompt:', userPrompt.substring(0, 200) + (userPrompt.length > 200 ? '...' : ''));
+}
+
+/**
+ * Sends a message to the background with retry logic that handles
+ * service worker restarts (MV3 idle shutdown).
+ */
+async function sendMessageWithRetry(message, maxAttempts = 3, delays = [500, 1000, 2000]) {
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        try {
+            const response = await chrome.runtime.sendMessage(message);
+            if (chrome.runtime.lastError) {
+                throw new Error(chrome.runtime.lastError.message);
+            }
+            return response;
+        } catch (err) {
+            const isDisconnect = /receiving end does not exist|disconnected/i.test(err.message);
+            if (!isDisconnect || attempt === maxAttempts - 1) {
+                throw err;
+            }
+            console.warn(`[Elu] Service worker disconnected (attempt ${attempt + 1}), retrying…`);
+            await new Promise(r => setTimeout(r, delays[Math.min(attempt, delays.length - 1)]));
+        }
+    }
+}
+
+// ─── AI output validation ──────────────────────────────────────────────────
+
+const STOP_WORDS = new Set([
+    'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
+    'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could',
+    'should', 'may', 'might', 'shall', 'can', 'to', 'of', 'in', 'for',
+    'on', 'with', 'at', 'by', 'from', 'as', 'into', 'through', 'during',
+    'before', 'after', 'above', 'below', 'between', 'out', 'off', 'over',
+    'under', 'again', 'further', 'then', 'once', 'and', 'but', 'or', 'nor',
+    'not', 'so', 'yet', 'both', 'each', 'few', 'more', 'most', 'other',
+    'some', 'such', 'no', 'only', 'own', 'same', 'than', 'too', 'very',
+    'just', 'because', 'if', 'when', 'while', 'that', 'this', 'it', 'its',
+    'he', 'she', 'they', 'them', 'we', 'you', 'i', 'my', 'your', 'his',
+    'her', 'their', 'our', 'all', 'also', 'about', 'up'
+]);
+
+function getContentWords(text) {
+    return new Set(
+        text.toLowerCase()
+            .replace(/[^\w\s]/g, '')
+            .split(/\s+/)
+            .filter(w => w.length > 2 && !STOP_WORDS.has(w))
+    );
+}
+
+/**
+ * Checks whether AI output is plausible given the original input.
+ * Returns null if valid, or a reason string if invalid.
+ */
+function validateSimplifiedOutput(input, output) {
+    const inputLen = input.trim().length;
+    const outputLen = output.trim().length;
+
+    // Length ratio guard: reject output that is absurdly long or near-empty
+    if (inputLen > 0) {
+        const ratio = outputLen / inputLen;
+        if (ratio > 3) return 'output_too_long';
+        if (ratio < 0.05) return 'output_too_short';
+    }
+
+    // Word-level similarity: at least 15% of content words should overlap
+    const inputWords = getContentWords(input);
+    const outputWords = getContentWords(output);
+    if (inputWords.size > 3) {
+        let overlap = 0;
+        for (const w of inputWords) {
+            if (outputWords.has(w)) overlap++;
+        }
+        const similarity = overlap / inputWords.size;
+        if (similarity < 0.15) return 'low_similarity';
+    }
+
+    return null;
+}
+
+/**
+ * Strips dangerous or unexpected patterns from AI output before rendering.
+ */
+function sanitizeAIOutput(text) {
+    return text
+        .replace(/```[\s\S]*?```/g, '')      // remove code fences
+        .replace(/<script[\s\S]*?<\/script>/gi, '')
+        .replace(/<style[\s\S]*?<\/style>/gi, '')
+        .replace(/<iframe[\s\S]*?<\/iframe>/gi, '')
+        .replace(/on\w+\s*=\s*["'][^"']*["']/gi, '')  // inline event handlers
+        .trim();
 }
 
 // Module-level prompt cache — avoids a background round-trip on every chunk.

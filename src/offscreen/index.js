@@ -27,47 +27,85 @@ const MODEL_ID = 'Llama-3.2-1B-Instruct-q4f16_1-MLC';
 /** @type {import('@mlc-ai/web-llm').MLCEngineInterface | null} */
 let engine = null;
 let engineStatus = 'unavailable'; // 'unavailable' | 'loading' | 'ready'
+let engineErrorReason = '';        // structured reason: 'no_webgpu' | 'init_failed' | ''
 let initPromise = null;
+
+const INIT_MAX_ATTEMPTS = 3;
+const INIT_BACKOFF_BASE_MS = 2000;
+const INFERENCE_TIMEOUT_MS = 30000;
 
 /**
  * Initialise (or return the existing) WebLLM engine.
- * Uses a Web Worker so WebGPU operations are off the main thread.
+ * Checks for WebGPU support first, then retries with exponential backoff.
  */
 async function initEngine() {
     if (engine && engineStatus === 'ready') return engine;
     if (initPromise) return initPromise;
 
-    engineStatus = 'loading';
-
-    initPromise = CreateWebWorkerMLCEngine(
-        new Worker(
-            chrome.runtime.getURL('assets/webllm-worker.js'),
-            { type: 'module' }
-        ),
-        MODEL_ID,
-        {
-            initProgressCallback: (progress) => {
-                // Forward download / compile progress to popup and other pages.
-                chrome.runtime.sendMessage({
-                    action: 'modelProgress',
-                    progress
-                }).catch(() => { /* popup may be closed — ignore */ });
-            }
-        }
-    ).then((e) => {
-        engine = e;
-        engineStatus = 'ready';
-        // Announce readiness
+    // WebGPU feature detection
+    if (!navigator.gpu) {
+        engineStatus = 'unavailable';
+        engineErrorReason = 'no_webgpu';
         chrome.runtime.sendMessage({
             action: 'modelProgress',
-            progress: { progress: 1, timeElapsed: 0, text: 'Model ready' }
+            progress: { progress: 0, text: 'WebGPU not supported by this browser or GPU' }
         }).catch(() => {});
-        return engine;
-    }).catch((err) => {
+        throw new Error('WebGPU is not supported by this browser or GPU.');
+    }
+
+    engineStatus = 'loading';
+    engineErrorReason = '';
+
+    initPromise = (async () => {
+        let lastError;
+        for (let attempt = 0; attempt < INIT_MAX_ATTEMPTS; attempt++) {
+            try {
+                const e = await CreateWebWorkerMLCEngine(
+                    new Worker(
+                        chrome.runtime.getURL('assets/webllm-worker.js'),
+                        { type: 'module' }
+                    ),
+                    MODEL_ID,
+                    {
+                        initProgressCallback: (progress) => {
+                            chrome.runtime.sendMessage({
+                                action: 'modelProgress',
+                                progress
+                            }).catch(() => {});
+                        }
+                    }
+                );
+                engine = e;
+                engineStatus = 'ready';
+                engineErrorReason = '';
+                chrome.runtime.sendMessage({
+                    action: 'modelProgress',
+                    progress: { progress: 1, timeElapsed: 0, text: 'Model ready' }
+                }).catch(() => {});
+                return engine;
+            } catch (err) {
+                lastError = err;
+                console.warn(`[Elu offscreen] Engine init attempt ${attempt + 1}/${INIT_MAX_ATTEMPTS} failed:`, err.message);
+
+                if (attempt < INIT_MAX_ATTEMPTS - 1) {
+                    const delay = INIT_BACKOFF_BASE_MS * Math.pow(2, attempt);
+                    chrome.runtime.sendMessage({
+                        action: 'modelProgress',
+                        progress: { progress: 0, text: `Download interrupted. Retrying in ${delay / 1000}s…` }
+                    }).catch(() => {});
+                    await new Promise(r => setTimeout(r, delay));
+                }
+            }
+        }
         engineStatus = 'unavailable';
+        engineErrorReason = 'init_failed';
         initPromise = null;
-        throw err;
-    });
+        chrome.runtime.sendMessage({
+            action: 'modelProgress',
+            progress: { progress: 0, text: 'Model download failed. Click Retry in the popup.' }
+        }).catch(() => {});
+        throw lastError;
+    })();
 
     return initPromise;
 }
@@ -79,11 +117,16 @@ let _inferenceQueue = Promise.resolve();
 
 /**
  * Schedule an inference request to run after any currently in-flight one.
- * Safe to call from concurrent message handlers.
+ * Applies a per-request timeout so one stalled inference can't block forever.
  */
 function queuedInference(systemPrompt, userPrompt) {
-    const task = _inferenceQueue.then(() => runInference(systemPrompt, userPrompt));
-    // Swallow queue-chain errors so one failure doesn't block future requests.
+    const task = _inferenceQueue.then(() => {
+        const inferenceP = runInference(systemPrompt, userPrompt);
+        const timeoutP = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Inference timed out')), INFERENCE_TIMEOUT_MS)
+        );
+        return Promise.race([inferenceP, timeoutP]);
+    });
     _inferenceQueue = task.catch(() => {});
     return task;
 }
@@ -142,7 +185,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         }
 
         case 'checkStatus': {
-            sendResponse({ success: true, status: engineStatus });
+            sendResponse({ success: true, status: engineStatus, errorReason: engineErrorReason });
             return false;
         }
 

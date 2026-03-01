@@ -2,8 +2,7 @@
 .env
 
 node_modules/
-dist\
-dist\assets/
+dist/
 build/
 
 # Logs
@@ -29,3 +28,21 @@ Thumbs.db
 
 # Vite
 .vite/
+
+# Chrome Extension
+*.crx
+*.pem
+*.zip
+
+# Temporary files
+temp/
+.temp/
+tmp/
+
+# Package manager
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+.github/
+.git/
