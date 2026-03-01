@@ -94,37 +94,6 @@ All processing occurs locally. No page content ever leaves the browser.
 
 ## Architecture
 
-```mermaid
-graph TD
-    UI["Browser UI<br/>Popup · Options · Onboarding"]
-    CS["Content Scripts<br/>Simplify · Chunk · Focus · TTS · Bionic · Glossary"]
-    BG["Background Service Worker<br/>Message Router · Prompt Library · Shortcuts"]
-    AI["Offscreen AI Engine<br/>WebLLM on WebGPU · Qwen2.5-0.5B"]
-    ST[("Chrome Storage<br/>Preferences · Reading Progress")]
-
-    UI -->|"trigger action"| CS
-    CS -->|"inference request"| BG
-    BG -->|"forward to model"| AI
-    AI -->|"simplified text"| BG
-    BG -->|"deliver result"| CS
-    UI <-->|"sync preferences"| ST
-    CS <-->|"read / write"| ST
-    BG <-->|"read / write"| ST
-
-    classDef ui fill:#7C3AED,stroke:#5B21B6,color:#fff
-    classDef content fill:#0D9488,stroke:#0F766E,color:#fff
-    classDef bg fill:#D97706,stroke:#B45309,color:#fff
-    classDef ai fill:#2563EB,stroke:#1D4ED8,color:#fff
-    classDef store fill:#374151,stroke:#1F2937,color:#fff
-
-    class UI ui
-    class CS content
-    class BG bg
-    class AI ai
-    class ST store
-
-```
-
 ![System Architecture — message flow between Browser UI, Content Scripts, Background Service Worker, Offscreen AI Engine, and Chrome Storage](docs/images/system-architecture.png)
 
 ### Key Architectural Decisions
