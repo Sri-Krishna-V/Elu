@@ -37,6 +37,8 @@ Elu targets a wide spectrum of cognitive and sensory needs: **dyslexia**, **ADHD
 - [Feature Reference](#feature-reference)
 - [Accessibility Design Principles](#accessibility-design-principles)
 - [Technology Stack](#technology-stack)
+- [AMD Hardware Integration](#amd-hardware-integration)
+- [Screenshots](#screenshots)
 - [Getting Started](#getting-started)
 - [Keyboard Shortcuts](#keyboard-shortcuts)
 - [Privacy Guarantee](#privacy-guarantee)
@@ -68,6 +70,8 @@ Elu intercepts the reading experience at the browser level and provides a layere
 | **Comprehension** | Inline glossary via double-click word lookup |
 
 All processing occurs locally. No page content ever leaves the browser.
+
+![AI Accessibility Reading System — Actors, system layers, and one-click intervention stack](docs/images/accessibility-system.png)
 
 ---
 
@@ -103,6 +107,8 @@ graph TD
     class ST store
 
 ```
+
+![System Architecture — message flow between Browser UI, Content Scripts, Background Service Worker, Offscreen AI Engine, and Chrome Storage](docs/images/system-architecture.png)
 
 ### Key Architectural Decisions
 
@@ -289,6 +295,37 @@ Elu is designed with **inclusion-by-design** values:
 | Fonts | OpenDyslexic (self-hosted) |
 
 The extension ships no backend. Inference is delegated to a **Web Worker** running inside a Chrome `offscreen` document, using **WebGPU** for hardware-accelerated matrix operations. The offscreen architecture prevents WebGPU workloads from blocking the extension's UI thread.
+
+![Technologies Used — full runtime, AI/ML, content, storage, and build stack](docs/images/tech-stack.png)
+
+---
+
+## AMD Hardware Integration
+
+Elu is designed to run on AMD Radeon hardware using the RDNA architecture's WebGPU compute capabilities. Every text simplification is a WebGPU workload dispatched directly to AMD GPU compute units via WGSL compute shaders.
+
+![AMD Products & Solutions — WebGPU on RDNA, MLC-AI compilation, VRAM management, and Ryzen AI forward path](docs/images/amd-products.png)
+
+| Integration | Detail |
+|---|---|
+| **WebGPU Compute on RDNA** | `@mlc-ai/web-llm` dispatches WGSL compute shaders to AMD GPU compute units for all LLM inference |
+| **MLC-AI Model Compilation** | WebLLM uses the MLC framework to auto-tune and compile LLM operators (GEMM, attention) into optimised shaders for RDNA specifically |
+| **On-Device VRAM Management** | Elu explicitly unloads and reloads the model via `engine.unload()` to be a responsible tenant on AMD integrated and discrete GPUs — critical on lower-VRAM Ryzen iGPU configs |
+| **AMD Ryzen AI — Forward Path** | The same `@mlc-ai/web-llm` stack is positioned to route inference via WebNN to the AMD XDNA NPU, a natural hardware upgrade path for Elu |
+
+> Elu runs entirely offline. For users in low-connectivity environments, the AMD GPU in their existing device is the only compute available. By targeting WebGPU, Elu democratises on-device AI accessibility tools to anyone with AMD Radeon hardware — no cloud subscription, no data leakage, no ongoing cost.
+
+---
+
+## Screenshots
+
+### Popup — Main Menu & Settings
+
+![Wireframes: main popup menu with simplification controls, reading tools, and settings panel](docs/images/wireframes-main.png)
+
+### Onboarding Flow
+
+![Wireframes: three-step onboarding — welcome, profile selection, and model/shortcut setup](docs/images/wireframes-onboarding.png)
 
 ---
 
