@@ -8,8 +8,8 @@ import {
     getFocusConfig,
     saveFocusConfig,
     DISTRACTION_SELECTORS,
-    MAIN_CONTENT_SELECTORS
 } from '../common/models/focus-config.js';
+import { MAIN_CONTENT_SELECTORS } from '../common/content-extractor.js';
 
 let isActive = false;
 let overlay = null;

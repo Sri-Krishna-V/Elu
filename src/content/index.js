@@ -6,6 +6,7 @@ import { initGlossary } from './glossary.js';
 import { initChunking, renderChunkedView, goToChunk, toggleBookmark, completeCurrentChunk, exitChunkedView, getProgress } from './smart-chunking.js';
 import { activateFocusMode, deactivateFocusMode, toggleFocusMode, isFocusModeActive, updateFocusConfig } from './focus-mode.js';
 import { getFocusConfig, DEFAULT_FOCUS_CONFIG } from '../common/models/focus-config.js';
+import { extractArticleText, extractArticleParagraphs, MAIN_CONTENT_SELECTORS } from '../common/content-extractor.js';
 import './content.css';
 import './chunking.css';
 
@@ -122,58 +123,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 try {
                     console.log('Finding main content element...');
 
-                    // Try to find the main content using various selectors, including Straits Times specific ones
-                    const mainContent = document.querySelector([
-                        'main',
-                        'article',
-                        '.content',
-                        '.post',
-                        '#content',
-                        '#main',
-                        'div[role="main"]',
-                        '.article-content',
-                        '.article-body',
-                        '.story-body',
-                        '.article-text',
-                        '.story-content',
-                        '[itemprop="articleBody"]',
-                        // Straits Times specific selectors
-                        '.paid-premium-content',
-                        '.str-story-body',
-                        '.str-article-content',
-                        '#story-body',
-                        '.story-content'
-                    ].join(', '));
-
-                    // Log the found element and its hierarchy
-                    if (mainContent) {
-                        console.log('Main content element details:', {
-                            element: mainContent,
-                            path: getElementPath(mainContent),
-                            parentClasses: mainContent.parentElement?.className,
-                            childElements: Array.from(mainContent.children).map(child => ({
-                                tag: child.tagName,
-                                class: child.className,
-                                id: child.id
-                            }))
-                        });
-                    }
-
-                    // Helper function to get element's DOM path
-                    function getElementPath(element) {
-                        const path = [];
-                        while (element && element.nodeType === Node.ELEMENT_NODE) {
-                            let selector = element.nodeName.toLowerCase();
-                            if (element.id) {
-                                selector += '#' + element.id;
-                            } else if (element.className) {
-                                selector += '.' + Array.from(element.classList).join('.');
-                            }
-                            path.unshift(selector);
-                            element = element.parentNode;
-                        }
-                        return path.join(' > ');
-                    }
+                    // Use shared content extractor (Readability → CSS selectors → heuristic)
+                    const { container: mainContent, elements: contentElements } = extractArticleParagraphs();
 
                     if (!mainContent) {
                         console.error('Could not find main content element');
@@ -186,11 +137,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                     const previouslySimplifiedElements = mainContent.querySelectorAll('[data-original-html]');
                     previouslySimplifiedElements.forEach(el => {
                         const originalHTML = el.getAttribute('data-original-html');
-                        // Create a temporary container to parse the original HTML
                         const tempDiv = document.createElement('div');
                         tempDiv.innerHTML = originalHTML;
                         const originalElement = tempDiv.firstChild;
-                        // Replace the simplified element with the original element
                         el.parentNode.replaceChild(originalElement, el);
                     });
 
@@ -207,53 +156,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
                     // Helper function to estimate token count (rough approximation)
                     const estimateTokens = (text) => {
-                        return text.split(/\s+/).length * 1.3; // Multiply by 1.3 as a safety factor
+                        return text.split(/\s+/).length * 1.3;
                     };
-
-                    // Get all content elements (paragraphs, headers, and lists)
-                    // More detailed logging of the main content element
-                    console.log('Main content structure:', {
-                        innerHTML: mainContent.innerHTML.substring(0, 200) + '...',
-                        childNodes: mainContent.childNodes.length,
-                        children: mainContent.children.length
-                    });
-
-                    // Try to find article content with more specific selectors
-                    const contentElements = Array.from(mainContent.querySelectorAll([
-                        'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'dl',
-                        '.article-content p',
-                        '.article-body p',
-                        '.story-body p',
-                        '.article-text p',
-                        '.story-content p',
-                        '[itemprop="articleBody"] p',
-                        '.article p',
-                        '.story p'
-                    ].join(', ')))
-                        .filter(el => {
-                            if (isHeader(el)) return true;
-
-                            // Skip elements that are likely metadata
-                            const isMetadata =
-                                el.closest('.author, .meta, .claps, .likes, .stats, .profile, .bio, header, footer, .premium-box') ||
-                                (el.tagName !== 'UL' && el.tagName !== 'OL' && el.tagName !== 'DL' && el.textContent.trim().length < 50) ||
-                                /^(By|Published|Updated|Written by|(\d+) min read|(\d+) claps)/i.test(el.textContent.trim());
-
-                            const hasContent = el.textContent.trim().length > 0;
-
-                            // Log skipped elements for debugging
-                            if (isMetadata || !hasContent) {
-                                console.log('Skipping element:', {
-                                    type: el.tagName,
-                                    class: el.className,
-                                    text: el.textContent.substring(0, 50) + '...',
-                                    reason: isMetadata ? 'metadata' : 'no content'
-                                });
-                            }
-
-                            // Include if it's not metadata and either a list or paragraph/header
-                            return !isMetadata && hasContent;
-                        });
 
                     console.log(`Found ${contentElements.length} content elements to process`);
 
@@ -378,18 +282,19 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
                             // Resolve system prompt once before the retry loop.
                             const currentSystemPrompt = await resolveSystemPrompt();
+                            const framedUserPrompt = `Rewrite this text:\n\n${chunkText}`;
                             let simplifiedText = '';
                             let attempts = 0;
                             const maxAttempts = 3;
 
                             while (attempts < maxAttempts) {
                                 try {
-                                    logPrompt(chunkText);
+                                    logPrompt(framedUserPrompt);
 
                                     const llmResponse = await sendMessageWithRetry({
                                         action: 'llmInfer',
                                         systemPrompt: currentSystemPrompt,
-                                        userPrompt: chunkText
+                                        userPrompt: framedUserPrompt
                                     });
                                     if (!llmResponse?.success) {
                                         throw new Error(llmResponse?.error || 'LLM inference failed');
@@ -725,7 +630,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
             case "getPageInfo":
                 try {
-                    const bodyText = document.body.innerText || '';
+                    const bodyText = extractArticleText();
                     const words = bodyText.split(/\s+/).filter(w => w.length > 0);
                     const wordCount = words.length;
                     const readTime = Math.max(1, Math.round(wordCount / 200));
@@ -753,7 +658,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
             case "undoSimplify":
                 try {
-                    const undoContent = document.querySelector('main, article, .content, .post, #content, #main, div[role="main"]');
+                    const undoContent = document.querySelector(MAIN_CONTENT_SELECTORS);
                     if (undoContent) {
                         // Restore replaced elements
                         const simplified = undoContent.querySelectorAll('[data-original-html]:not([data-elu-hidden])');

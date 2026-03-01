@@ -120,18 +120,5 @@ export const DISTRACTION_SELECTORS = {
     ]
 };
 
-/**
- * Main content selectors
- */
-export const MAIN_CONTENT_SELECTORS = [
-    'article',
-    '[role="main"]',
-    'main',
-    '.post-content',
-    '.article-content',
-    '.entry-content',
-    '.content-body',
-    '#content',
-    '.story-body',
-    '.article-body'
-].join(', ');
+// MAIN_CONTENT_SELECTORS has been moved to ../content-extractor.js
+// Import from there: import { MAIN_CONTENT_SELECTORS } from '../common/content-extractor.js';

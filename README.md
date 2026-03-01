@@ -17,6 +17,7 @@ Elu (short for **Elucidate**) is a Chrome extension that transforms web content 
 - [Module Reference](#module-reference)
 - [Data Models](#data-models)
 - [AI Integration](#ai-integration)
+- [Content Extraction](#content-extraction)
 - [Build System](#build-system)
 - [Extension Manifest](#extension-manifest)
 - [Keyboard Shortcuts](#keyboard-shortcuts)
@@ -31,20 +32,22 @@ Elu (short for **Elucidate**) is a Chrome extension that transforms web content 
 
 ### AI Text Simplification
 
-Rewrites page content using **Llama-3.2-1B-Instruct-q4f16_1-MLC** running entirely on-device via [WebLLM](https://github.com/mlc-ai/web-llm) and WebGPU. The model runs inside a dedicated **offscreen document** with a Web Worker so inference never blocks the extension UI. The simplification pipeline selects a system prompt based on two user-controlled axes:
+Rewrites page content using **Qwen2.5-0.5B-Instruct-q4f16_1-MLC** running entirely on-device via [WebLLM](https://github.com/mlc-ai/web-llm) and WebGPU. The model runs inside a dedicated **offscreen document** with a Web Worker so inference never blocks the extension UI. The simplification pipeline selects a system prompt based on two user-controlled axes:
 
 - **Optimization mode** — `textClarity` (general readability), `focusStructure` (ADHD-oriented paragraph chunking), or `wordPattern` (dyslexia-oriented sentence patterning).
 - **Simplification level** — 1 through 5, where level 1 lightly improves structure and level 5 rewrites in the simplest possible language. The UI exposes 3 levels (Low / Mid / High) by default, configurable via `src/common/config.js`.
 
-System prompts are defined in `src/background/prompts.js` as a nested object keyed by `[mode][level]`. They are fetched by the content script from the background service worker via `chrome.runtime.sendMessage`.
+System prompts are defined in `src/background/prompts.js` as a nested object keyed by `[mode][level]`. Every prompt includes explicit role framing (`You are a text rewriting assistant`), an output format specification (Markdown), and a paragraph-preservation instruction, which is critical because the DOM replacement logic maps simplified paragraphs back to original elements 1:1 via `\n\n` splitting. Prompts are fetched by the content script from the background service worker via `chrome.runtime.sendMessage` and cached locally after the first call.
 
-The content script sends inference requests to the background service worker, which routes them to the offscreen document. The offscreen document maintains a serial inference queue to prevent concurrent model conflicts. Responses are returned via the OpenAI-compatible chat completions API provided by WebLLM. The output is rendered as HTML using the `marked` library.
+Content is extracted using Mozilla's **Readability.js** (the same engine behind Firefox Reader View) before chunking, so only article text — not navigation, footers, or sidebars — is sent to the model. The user message is prefixed with `"Rewrite this text:\n\n"` to improve compliance from the small model.
+
+The content script sends inference requests to the background service worker, which routes them to the offscreen document. The offscreen document maintains a serial inference queue to prevent concurrent model conflicts. Responses are returned via the OpenAI-compatible chat completions API provided by WebLLM and rendered as HTML using the `marked` library.
 
 ### Smart Content Chunking
 
 Breaks long-form articles into manageable reading segments without modifying the source HTML permanently.
 
-- **Content detection**: Queries a prioritized list of semantic selectors (`article`, `[role="main"]`, `main`, `.post-content`, `.article-body`, and others) to locate the primary content region.
+- **Content detection**: Uses the shared `extractArticleParagraphs()` utility from `src/common/content-extractor.js` (backed by Mozilla Readability with a CSS-selector fallback) to locate the primary content region.
 - **Element filtering**: Extracts block elements (`p`, `h1`–`h6`, `li`, `blockquote`), skipping hidden elements, very short strings (under 10 characters), and elements inside `nav`, `footer`, `aside`, `.comments`, or `.related`.
 - **Chunking algorithm**: Groups elements into chunks targeting 150 words, with a hard minimum of 50 and maximum of 300 words per chunk. A new chunk is forced when the running word count would exceed the maximum.
 - **Complexity scoring**: Each chunk is assigned `low`, `medium`, or `high` complexity based on average words per sentence and average word length. Sentences averaging over 25 words or words averaging over 6 characters score `high`.
@@ -65,9 +68,10 @@ Creates a distraction-free reading environment by manipulating the live DOM:
 
 ### Bionic Reading
 
-Applies bionic reading formatting to the live page DOM:
+Applies bionic reading formatting to the article content in the live page DOM:
 
-- Uses a `TreeWalker` to traverse all text nodes under `document.body`.
+- Scopes processing to the article element returned by `extractArticleElement()` (from `src/common/content-extractor.js`), so navigation, footers, and sidebars are never bolded.
+- Uses a `TreeWalker` to traverse all text nodes within the article container.
 - Skips nodes inside `SCRIPT`, `STYLE`, `TEXTAREA`, `INPUT`, `NOSCRIPT`, `CODE`, and `PRE` tags, as well as `contenteditable` elements.
 - For each word, bolds the first half of its characters (minimum 1, using `Math.ceil(length / 2)`), wrapping the bold portion in a `<b class="bionic-highlight">` element.
 - Wraps each processed text node in a `<span class="bionic-processed">` to prevent double-processing.
@@ -75,9 +79,10 @@ Applies bionic reading formatting to the live page DOM:
 
 ### Text-to-Speech
 
-Reads page content aloud using the Web Speech API (`SpeechSynthesis`):
+Reads article content aloud using the Web Speech API (`SpeechSynthesis`):
 
-- Splits `document.body.innerText` into paragraphs on double newlines, filtering out fragments under 20 characters.
+- Extracts text using `extractArticleText()` from `src/common/content-extractor.js` — reads only the article body, not navigation, footers, cookie banners, or sidebars.
+- Splits the article text into paragraphs on double newlines, filtering out fragments under 20 characters.
 - Reads paragraphs sequentially using chained `SpeechSynthesisUtterance` instances.
 - Supports runtime-adjustable speech rate and voice selection (any voice returned by `speechSynthesis.getVoices()`).
 - Broadcasts paragraph-level progress events via `chrome.runtime.sendMessage` so the popup can display playback state.
@@ -89,7 +94,7 @@ Provides on-demand word definitions via double-click:
 
 - Filters out common English words using a pre-bundled dictionary set (`src/common/dictionary.js`) to avoid trivial lookups.
 - Ignores selections containing whitespace (single words only) and words longer than 40 characters.
-- Fetches a definition from the WebLLM engine via the background → offscreen inference pipeline (same Llama-3.2-1B model used for simplification).
+- Fetches a definition from the WebLLM engine via the background → offscreen inference pipeline (same Qwen2.5-0.5B model used for simplification).
 - Renders the definition in a Shadow DOM tooltip anchored below the selected word, using a fade-in animation. Shadow DOM isolation prevents host-page styles from affecting the tooltip.
 
 ### Visual Accessibility and Customization
@@ -160,7 +165,7 @@ Elu follows the standard Chrome Extension Manifest V3 architecture, composed of 
 │  │  - Serial inference queue                 │  ┌─────────────┐ │
 │  │  - Model download progress broadcast      ├──▶ Web Worker   │ │
 │  │                                           │  │ (WebGPU /    │ │
-│  │  Llama-3.2-1B-Instruct-q4f16_1-MLC       │  │  WebAssembly)│ │
+│  │  Qwen2.5-0.5B-Instruct-q4f16_1-MLC        │  │  WebAssembly)│ │
 │  └───────────────────────────────────────────┘  └─────────────┘ │
 └──────────────────────────────────────────────────────────────────┘
 ```
@@ -191,11 +196,12 @@ Elu/
 │   │   └── prompts.js          # System prompt definitions for all AI modes and levels
 │   ├── common/
 │   │   ├── config.js           # Shared configuration (e.g., simplification level count)
+│   │   ├── content-extractor.js# Article extraction via Readability + CSS fallback (shared by all features)
 │   │   ├── dictionary.js       # Common English word set for glossary filtering
 │   │   ├── logger.js           # Batched async logger (writes to chrome.storage every 5s)
 │   │   └── models/
 │   │       ├── chunk.js        # ContentChunk and ReadingProgress data model factories
-│   │       └── focus-config.js # FocusConfig model, defaults, and storage helpers
+│   │       └── focus-config.js # FocusConfig model, defaults, distraction selectors, and storage helpers
 │   ├── content/
 │   │   ├── index.js            # Content script entry point; message handler and orchestration
 │   │   ├── smart-chunking.js   # Chunking algorithm and progress management
@@ -237,13 +243,20 @@ The Manifest V3 service worker. Responsibilities:
 
 ### `src/background/prompts.js`
 
-Exports a `systemPrompts` object with three top-level keys (`textClarity`, `focusStructure`, `wordPattern`), each mapping level strings `"1"` through `"5"` to a tailored system prompt string. Prompts are written to instruct the model to rewrite text for specific cognitive accessibility needs while preserving proper names, places, and direct quotes.
+Exports a `systemPrompts` object with three top-level keys (`textClarity`, `focusStructure`, `wordPattern`), each mapping level strings `"1"` through `"5"` to a system prompt string optimized for **Qwen2.5-0.5B-Instruct**. Every prompt follows a consistent structure:
+
+1. **Role framing** — `"You are a text rewriting assistant."` (explicit persona improves small-model compliance).
+2. **Output format** — `"Use Markdown format"` (matches the `marked.parse()` rendering pipeline).
+3. **Target audience** — mode and level-specific instructions (reading grade, ADHD structure, dyslexia patterns).
+4. **Paragraph preservation** — `"Keep the SAME number of paragraphs. Separate paragraphs with two blank lines."` Critical for the 1:1 DOM replacement mapping.
+5. **Output gate** — `"Output ONLY the rewritten text."` Suppresses model preamble and filler text.
 
 ### `src/content/index.js`
 
 The main content script. Key responsibilities:
 
-- **LLM delegation**: AI inference is no longer handled locally. The content script resolves the appropriate system prompt (from cached prompts fetched via the background worker) and sends `{ action: 'llmInfer', systemPrompt, userPrompt }` to the background, which routes it to the offscreen document. Includes a retry loop (up to 2 attempts) per chunk.
+- **Content extraction**: Uses `extractArticleParagraphs()` from `src/common/content-extractor.js` (Mozilla Readability + CSS-selector fallback) to identify the article container and article-level DOM elements before any processing.
+- **LLM delegation**: The content script resolves the appropriate system prompt (from cached prompts fetched via the background worker) and frames the user message as `"Rewrite this text:\n\n{content}"` before sending `{ action: 'llmInfer', systemPrompt, userPrompt }` to the background, which routes it to the offscreen document. Includes a retry loop (up to 3 attempts) per chunk.
 - **Message routing**: A `chrome.runtime.onMessage` listener dispatches incoming actions (`simplify`, `chunk-start`, `focus-toggle`, `tts-play`, `tts-pause`, `tts-stop`, `bionic-toggle`, `theme-change`, `font-toggle`, `spacing-change`, etc.) to the appropriate sub-module.
 - **Theme application**: Applies `backgroundColor` and `textColor` via a scoped `<style>` element targeting text-bearing elements, preserving images, SVGs, and Elu's own injected UI.
 - **Spacing**: Applies `lineHeight`, `letterSpacing`, and `wordSpacing` via a dynamic `<style>` element on `document.head`.
@@ -278,14 +291,14 @@ See [Focus Mode](#focus-mode) above. Exported API:
 
 | Function | Description |
 |---|---|
-| `applyBionicReading(rootElement)` | Applies bionic formatting to all text nodes under `rootElement` (defaults to `document.body`). |
+| `applyBionicReading(rootElement)` | Applies bionic formatting to all text nodes under `rootElement` (defaults to `extractArticleElement()` — the article container, not `document.body`). |
 | `removeBionicReading()` | Strips all bionic formatting and normalizes text nodes. |
 
 ### `src/content/tts.js`
 
 | Function | Description |
 |---|---|
-| `handleTTSAction(action, options)` | Dispatcher for `tts-play`, `tts-pause`, `tts-resume`, `tts-stop`, `tts-set-speed`, `tts-set-voice`. |
+| `handleTTSAction(action, options)` | Dispatcher for `tts-play`, `tts-pause`, `tts-resume`, `tts-stop`, `tts-set-speed`, `tts-set-voice`. Reads article text via `extractArticleText()`, not `document.body.innerText`. |
 | `getTTSState()` | Returns `{ isPlaying, isPaused, currentParagraphIndex, totalParagraphs }`. |
 
 ### `src/content/glossary.js`
@@ -300,9 +313,9 @@ Glossary definitions are fetched via the same `llmInfer` pipeline as simplificat
 
 The offscreen document script. Owns the WebLLM engine instance and manages its lifecycle:
 
-- **Engine initialization** (`initEngine`): Spawns a Web Worker at `assets/webllm-worker.js` and creates a `CreateWebWorkerMLCEngine` instance for the `Llama-3.2-1B-Instruct-q4f16_1-MLC` model. Broadcasts download/compile progress via `chrome.runtime.sendMessage({ action: 'modelProgress' })`. Auto-initialises on document load for faster first inference.
-- **Serial inference queue** (`queuedInference`): Ensures only one completion request runs at a time. Failures are swallowed at the queue level so one bad request doesn't block subsequent ones.
-- **Inference** (`runInference`): Creates a self-contained message history (`[system, user]`) per request — no conversation carry-over. Uses `temperature: 0.7` and `max_tokens: 2048`.
+- **Engine initialization** (`initEngine`): Spawns a Web Worker at `assets/webllm-worker.js` and creates a `CreateWebWorkerMLCEngine` instance for the `Qwen2.5-0.5B-Instruct-q4f16_1-MLC` model. Broadcasts download/compile progress via `chrome.runtime.sendMessage({ action: 'modelProgress' })`. Retries up to 3 times with exponential backoff on failure. Auto-initialises on document load for faster first inference.
+- **Serial inference queue** (`queuedInference`): Ensures only one completion request runs at a time. Failures are swallowed at the queue level so one bad request doesn't block subsequent ones. Per-request timeout: 3 minutes.
+- **Inference** (`runInference`): Creates a self-contained message history (`[system, user]`) per request — no conversation carry-over. Uses `temperature: 0.3` (low, for deterministic rewriting) and `max_tokens: 1200`.
 
 | Message action | Description |
 |---|---|
@@ -333,7 +346,21 @@ A thin Web Worker that instantiates `WebWorkerMLCEngineHandler` from `@mlc-ai/we
 | `saveFocusConfig(partial)` | Deep-merges and writes `FocusConfig` to storage. |
 | `FOCUS_CONFIG_KEY` | Storage key constant: `"elu_focus_config"`. |
 | `DISTRACTION_SELECTORS` | Object of CSS selector arrays for `comments`, `sidebars`, `ads`, `popups`, `related`. |
-| `MAIN_CONTENT_SELECTORS` | CSS selector string for identifying primary content. |
+
+> `MAIN_CONTENT_SELECTORS` was previously exported from here and is now the single canonical export from `src/common/content-extractor.js`.
+
+### `src/common/content-extractor.js`
+
+Shared article content extraction module used by every feature that reads page text.
+
+| Export | Description |
+|---|---|
+| `extractArticleText()` | Returns the article's plain text as a string. Used by TTS and PageInfo. |
+| `extractArticleElement()` | Returns the live DOM element containing the article. Used by Bionic Reading. |
+| `extractArticleParagraphs()` | Returns `{ container, elements[] }` — filtered paragraph/heading elements from the article. Used by Simplification and Smart Chunking. |
+| `MAIN_CONTENT_SELECTORS` | CSS selector string for the primary content container (canonical source). |
+
+**Extraction fallback chain**: Mozilla Readability → CSS selector matching → largest text-dense block → `document.body`. Readability is used for `extractArticleText()` (returns `article.textContent`). All three functions share the same container-detection logic.
 
 ### `src/common/logger.js`
 
@@ -391,41 +418,74 @@ A batched, async logging utility. Collects log entries in memory and flushes the
 
 ## AI Integration
 
-Elu uses **[WebLLM](https://github.com/mlc-ai/web-llm)** to run **Llama-3.2-1B-Instruct-q4f16_1-MLC** entirely on-device via WebGPU. No external API calls are made. All inference runs inside a Chrome offscreen document with a dedicated Web Worker, keeping the extension UI fully responsive.
+Elu uses **[WebLLM](https://github.com/mlc-ai/web-llm)** to run **Qwen2.5-0.5B-Instruct-q4f16_1-MLC** entirely on-device via WebGPU. No external API calls are made. All inference runs inside a Chrome offscreen document with a dedicated Web Worker, keeping the extension UI fully responsive.
 
 **Inference lifecycle:**
 
 1. On extension install or update, the background service worker pre-creates the offscreen document, which immediately starts warming up the WebLLM engine (`CreateWebWorkerMLCEngine`).
-2. When the user triggers simplification, the content script resolves the appropriate system prompt by reading `simplificationLevel` (1–5) and `optimizeFor` mode from `chrome.storage.sync`, then fetching the prompt table from the background worker.
-3. The content script sends `{ action: 'llmInfer', systemPrompt, userPrompt }` to the background service worker.
-4. The background routes the request to the offscreen document via `chrome.runtime.sendMessage({ target: 'offscreen', ... })`.
-5. The offscreen document queues the request (serial inference queue) and calls `engine.chat.completions.create()` with `temperature: 0.7` and `max_tokens: 2048`. Each request uses a fresh `[system, user]` message array — no conversation carry-over.
-6. The result is returned to the content script, parsed by `marked`, and injected into the DOM.
+2. When the user triggers simplification, the content script uses `extractArticleParagraphs()` to identify article-only DOM elements (nav, footer, and sidebars are excluded).
+3. The content script resolves the appropriate system prompt by reading `simplificationLevel` (1–5) and `optimizeFor` mode from `chrome.storage.sync`, then fetching the prompt table from the background worker.
+4. Each chunk is sent as `{ action: 'llmInfer', systemPrompt, userPrompt: 'Rewrite this text:\n\n{chunk}' }` to the background service worker.
+5. The background routes the request to the offscreen document via `chrome.runtime.sendMessage({ target: 'offscreen', ... })`.
+6. The offscreen document queues the request (serial inference queue) and calls `engine.chat.completions.create()` with `temperature: 0.3` and `max_tokens: 1200`. Each request uses a fresh `[system, user]` message array — no conversation carry-over.
+7. The result is returned to the content script, parsed by `marked`, and injected into the DOM with full undo support.
 
 **Model details:**
 
 | Property | Value |
 |---|---|
-| Model | Llama-3.2-1B-Instruct-q4f16_1-MLC |
+| Model | Qwen2.5-0.5B-Instruct-q4f16_1-MLC |
 | Quantization | 4-bit (q4f16_1) |
 | Runtime | WebLLM (`@mlc-ai/web-llm` ^0.2.81) |
 | Backend | WebGPU (falls back to WebAssembly) |
 | Inference location | Offscreen document → Web Worker |
-| Download size | ~800 MB (cached by the browser after first download) |
+| Temperature | 0.3 (low, for consistent deterministic rewrites) |
+| Max tokens | 1,200 per chunk |
+| Download size | ~400 MB (cached by the browser after first download) |
 
-**System prompt matrix:**
+**System prompt matrix (3 modes × 5 levels):**
 
 ```
-optimizeFor:  textClarity   |   focusStructure   |   wordPattern
-              (readability)   (ADHD/structure)     (dyslexia/patterns)
-level 1:      light edits   |   visual breaks     |   consistent layout
-level 2:      clearer terms |   clearer headings  |   simpler patterns
-level 3:      simple vocab  |   bullets/chunks    |   short sentences
-level 4:      basic words   |   short paragraphs  |   basic patterns
-level 5:      elementary    |   max structure     |   minimal vocabulary
+optimizeFor:  textClarity     |   focusStructure     |   wordPattern
+              (readability)     (ADHD/structure)       (dyslexia/patterns)
+level 1:      light edits     |   visual breaks       |   consistent SVO layout
+level 2:      8th-grade       |   bolded headings     |   remove idioms
+level 3:      5th-grade       |   one idea/paragraph  |   predictable patterns
+level 4:      3rd-grade       |   1-2 sentence paras  |   uniform ~10-word sentences
+level 5:      1st-grade       |   bullet points       |   minimal vocabulary
 ```
+
+All prompts include: role framing, Markdown output format, paragraph-count preservation, and a strict output gate (`Output ONLY the rewritten text`).
 
 **Glossary definitions** use the same inference pipeline (background → offscreen) with a dedicated system prompt that instructs the model to return a concise one-sentence definition.
+
+---
+
+## Content Extraction
+
+All features that process page text use a single shared extraction layer at `src/common/content-extractor.js`, backed by **[Mozilla Readability](https://github.com/mozilla/readability)** — the same library that powers Firefox Reader View.
+
+**Why this matters:** Without proper extraction, TTS reads navigation menus, footer links, cookie banners, and comment sections. Bionic formatting applied to nav bars and footers creates visual noise without any reading benefit. Word count metrics are inflated by non-article content.
+
+**Fallback chain:**
+
+```
+1. Mozilla Readability   — parse article from document clone (handles most news, blogs, Medium)
+2. CSS selector match    — article, [role="main"], main, .post-content, .article-body, …
+3. Largest text block    — heuristic: largest visible <div>/<section> by text length
+4. document.body         — last resort, never omitted
+```
+
+**Per-feature usage:**
+
+| Feature | Function used | Before | After |
+|---|---|---|---|
+| TTS | `extractArticleText()` | `document.body.innerText` (entire page) | Article text only |
+| Bionic Reading | `extractArticleElement()` | `document.body` TreeWalker | Article element scoped |
+| PageInfo (word count, read time) | `extractArticleText()` | `document.body.innerText` (entire page) | Article text only |
+| Simplification | `extractArticleParagraphs()` | Inline CSS selectors | Readability + filtered elements |
+| Smart Chunking | `extractArticleParagraphs()` | Inline `CONTENT_SELECTORS` | Shared extraction |
+| Focus Mode | `MAIN_CONTENT_SELECTORS` (constant) | Imported from `focus-config.js` | Imported from `content-extractor.js` |
 
 ---
 
@@ -459,7 +519,8 @@ The project uses ES Modules (`"type": "module"` in `package.json`). All six entr
 | Package | Version | Purpose |
 |---|---|---|
 | `vite` | `^7.3.1` | Build tool (dev dependency) |
-| `@mlc-ai/web-llm` | `^0.2.81` | WebLLM runtime (available for local model inference) |
+| `@mlc-ai/web-llm` | `^0.2.81` | On-device inference via WebGPU |
+| `@mozilla/readability` | `^0.5.x` | Article content extraction (Firefox Reader View engine) |
 | `marked` | `^17.0.1` | Markdown-to-HTML rendering for AI output |
 
 ---
@@ -510,10 +571,10 @@ Shortcuts are defined in `manifest.json` under `commands` and dispatched by the 
 
 - **Google Chrome** version >= 113 (WebGPU support required; available in stable Chrome since May 2023)
 - **GPU**: A WebGPU-compatible discrete or integrated GPU. Check compatibility at `chrome://gpu/` — look for "WebGPU" in the Graphics Feature Status section.
-- **Disk space**: ~2 GB free for the Llama-3.2-1B-Instruct model weights (downloaded and cached by WebLLM on first use)
+- **Disk space**: ~800 MB free for the Qwen2.5-0.5B-Instruct model weights (downloaded and cached by WebLLM on first use)
 - **Node.js** >= 18 and **npm** >= 9
 
-> **Note:** No Chrome flags are required. Unlike the earlier Prompt API approach, WebLLM works out of the box on any Chrome version with WebGPU support. The model is downloaded and compiled automatically on first launch.
+> **Note:** No Chrome flags are required. WebLLM works out of the box on any Chrome version with WebGPU support. The model is downloaded and compiled automatically on first launch.
 
 ### Installation
 
@@ -565,7 +626,8 @@ Shortcuts are defined in `manifest.json` under `commands` and dispatched by the 
 All text processing, AI inference, and data storage occur entirely on the local device.
 
 - No page content, reading data, or user preferences are transmitted to any external server.
-- The Llama-3.2-1B model runs inside Chrome's offscreen document via WebLLM and WebGPU — all inference is on-device.
+- The Qwen2.5-0.5B-Instruct model runs inside Chrome's offscreen document via WebLLM and WebGPU — all inference is on-device.
+- Mozilla Readability processes the page DOM entirely in the content script — no content leaves the browser.
 - WebLLM downloads model weights from the MLC model hub on first launch. After the initial download, the model is cached locally and no further network requests are made during inference.
 - `chrome.storage.sync` is used for preferences; this syncs across the user's devices via their Chrome account but is never accessible to or transmitted by Elu.
 

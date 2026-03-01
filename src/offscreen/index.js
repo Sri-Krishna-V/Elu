@@ -201,8 +201,8 @@ async function runInference(systemPrompt, userPrompt) {
 
     const reply = await e.chat.completions.create({
         messages,
-        temperature: 0.7,
-        max_tokens: 800, // Reduced from 2048 for faster generation
+        temperature: 0.3,
+        max_tokens: 1200,
         stream: false
     });
 

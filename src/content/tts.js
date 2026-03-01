@@ -1,3 +1,4 @@
+import { extractArticleText } from '../common/content-extractor.js';
 
 let utterance = null;
 let currentParagraphIndex = 0;
@@ -38,8 +39,8 @@ export function handleTTSAction(action, options = {}) {
 }
 
 function startReading() {
-    const bodyText = document.body.innerText;
-    paragraphs = bodyText
+    const articleText = extractArticleText();
+    paragraphs = articleText
         .split(/\n\n+/)
         .map(p => p.trim())
         .filter(p => p.length > 20);

@@ -1,6 +1,7 @@
+import { extractArticleElement } from '../common/content-extractor.js';
 
 export function applyBionicReading(rootElement) {
-    if (!rootElement) rootElement = document.body;
+    if (!rootElement) rootElement = extractArticleElement();
 
     const walker = document.createTreeWalker(
         rootElement,
