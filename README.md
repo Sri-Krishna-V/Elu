@@ -18,6 +18,10 @@
 </div>
 
 ---
+### Reading Experience
+
+![Webpage with Elu active — article extracted, chunked, and styled](docs/images/wireframe-webpage.jpeg)
+
 
 ### Popup — Main Menu & Settings
 
@@ -26,10 +30,6 @@
 ### Onboarding Flow
 
 ![Three-step onboarding — welcome, profile selection, and model/shortcut setup](docs/images/wireframes-onboarding.png)
-
-### Reading Experience
-
-![Webpage with Elu active — article extracted, chunked, and styled](docs/images/wireframe-webpage.jpeg)
 
 ---
 
