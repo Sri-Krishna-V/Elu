@@ -157,7 +157,7 @@ export function renderChunkedView() {
         return;
     }
 
-    const mainContent = document.querySelector(CONTENT_SELECTORS);
+    const mainContent = document.querySelector(MAIN_CONTENT_SELECTORS);
     if (!mainContent) return;
 
     // Create chunk container
@@ -384,7 +384,7 @@ export function exitChunkedView() {
     saveProgressAsync();
 
     // Restore original content
-    const mainContent = document.querySelector(CONTENT_SELECTORS);
+    const mainContent = document.querySelector(MAIN_CONTENT_SELECTORS);
     if (mainContent && originalContent) {
         mainContent.innerHTML = originalContent.innerHTML;
     }
