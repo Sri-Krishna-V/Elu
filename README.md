@@ -1,4 +1,8 @@
+<div align="center">
+
 # Elu — AI-Powered Accessible Reading Assistant
+
+</div>
 
 <div align="center">
   <img src="public/images/icon128.png" alt="Elu Logo" width="128" height="128" />
@@ -22,10 +26,11 @@
 </div>
 
 ---
-### Reading Experience
 
-![Webpage with Elu active — article extracted, chunked, and styled](docs/images/wireframe-webpage.jpeg)
----
+<div align="center">
+  <br/>
+  <img src="docs/images/wireframe-webpage.jpeg" alt="Webpage with Elu active — article extracted, chunked, and styled" />
+</div>
 
 > **AMD Slingshot 2026 Submission** — Theme: *AI for Social Good*
 > Category: Assistive tools for vision, speech, reading, and neurodiverse learners.
@@ -38,11 +43,15 @@ Built for a wide spectrum of cognitive and sensory needs: **dyslexia**, **ADHD**
 
 ### Popup — Main Menu & Settings
 
-![Wireframes: main popup menu with simplification controls, reading tools, and settings panel](docs/images/wireframes-main.png)
+<div align="center">
+  <img src="docs/images/wireframes-main.png" alt="Wireframes: main popup menu with simplification controls, reading tools, and settings panel" />
+</div>
 
 ### Onboarding Flow
 
-![Wireframes: three-step onboarding — welcome, profile selection, and model/shortcut setup](docs/images/wireframes-onboarding.png)
+<div align="center">
+  <img src="docs/images/wireframes-onboarding.png" alt="Wireframes: three-step onboarding — welcome, profile selection, and model/shortcut setup" />
+</div>
 
 ---
 
@@ -56,7 +65,6 @@ Built for a wide spectrum of cognitive and sensory needs: **dyslexia**, **ADHD**
 - [Accessibility Design Principles](#accessibility-design-principles)
 - [Technology Stack](#technology-stack)
 - [AMD Hardware Integration](#amd-hardware-integration)
-- [Screenshots](#screenshots)
 - [Getting Started](#getting-started)
 - [Keyboard Shortcuts](#keyboard-shortcuts)
 - [Privacy Guarantee](#privacy-guarantee)
@@ -89,12 +97,13 @@ Elu intercepts the reading experience at the browser level and provides a layere
 
 All processing occurs locally. No page content ever leaves the browser.
 
-
 ---
 
 ## Architecture
 
-![System Architecture — message flow between Browser UI, Content Scripts, Background Service Worker, Offscreen AI Engine, and Chrome Storage](docs/images/system-architecture.png)
+<div align="center">
+  <img src="docs/images/system-architecture.png" alt="System Architecture — message flow between Browser UI, Content Scripts, Background Service Worker, Offscreen AI Engine, and Chrome Storage" />
+</div>
 
 ### Key Architectural Decisions
 
@@ -108,7 +117,18 @@ All processing occurs locally. No page content ever leaves the browser.
 
 ## Use Cases
 
-![AI Accessibility Reading System — Actors, system layers, and one-click intervention stack](docs/images/accessibility-system.png)
+Elu serves four primary reader profiles, each mapped to a tailored combination of features:
+
+| Reader | Primary Needs | Key Features |
+|---|---|---|
+| **Dyslexia** | Letter confusion, reading fatigue | Bionic Reading, OpenDyslexic font, Word Pattern simplification, Cream Paper theme |
+| **ADHD** | Distraction, attention drop-off | Focus Mode, Smart Chunking, Focus Structure simplification, Pomodoro timer |
+| **Low Vision** | Contrast, font size, spacing | High Contrast themes, maximum spacing controls, TTS, large typography |
+| **General Reader** | Comprehension, reading speed | Text Clarity simplification, Smart Chunking, Glossary, TTS |
+
+<div align="center">
+  <img src="docs/images/accessibility-system.png" alt="AI Accessibility Reading System — Actors, system layers, and one-click intervention stack" />
+</div>
 
 ---
 
@@ -220,7 +240,9 @@ Elu is designed with **inclusion-by-design** values:
 
 The extension ships no backend. Inference is delegated to a **Web Worker** running inside a Chrome `offscreen` document, using **WebGPU** for hardware-accelerated matrix operations. The offscreen architecture prevents WebGPU workloads from blocking the extension's UI thread.
 
-![Technologies Used — full runtime, AI/ML, content, storage, and build stack](docs/images/tech-stack.png)
+<div align="center">
+  <img src="docs/images/tech-stack.png" alt="Technologies Used — full runtime, AI/ML, content, storage, and build stack" />
+</div>
 
 ---
 
@@ -228,7 +250,9 @@ The extension ships no backend. Inference is delegated to a **Web Worker** runni
 
 Elu is designed to run on AMD Radeon hardware using the RDNA architecture's WebGPU compute capabilities. Every text simplification is a WebGPU workload dispatched directly to AMD GPU compute units via WGSL compute shaders.
 
-![AMD Products & Solutions — WebGPU on RDNA, MLC-AI compilation, VRAM management, and Ryzen AI forward path](docs/images/amd-products.png)
+<div align="center">
+  <img src="docs/images/amd-products.png" alt="AMD Products &amp; Solutions — WebGPU on RDNA, MLC-AI compilation, VRAM management, and Ryzen AI forward path" />
+</div>
 
 | Integration | Detail |
 |---|---|
