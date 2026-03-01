@@ -75,48 +75,6 @@ All processing occurs locally. No page content ever leaves the browser.
 
 ```mermaid
 graph TD
-    UI["Browser UI\nPopup · Options · Onboarding"]
-    CS["Content Scripts\nSimplify · Chunk · Focus · TTS · Bionic · Glossary"]
-    BG["Background Service Worker\nMessage Router · Prompt Library · Shortcuts"]
-    AI["Offscreen AI Engine\nWebLLM on WebGPU · Qwen2.5-0.5B"]
-    ST[("Chrome Storage\nPreferences · Reading Progress")]
-
-    UI -->|"trigger action"| CS
-    CS -->|"inference request"| BG
-    BG -->|"forward to model"| AI
-    AI -->|"simplified text"| BG
-    BG -->|"deliver result"| CS
-    UI <-->|"sync preferences"| ST
-    CS <-->|"read / write"| ST
-    BG <-->|"read / write"| ST
-
-    classDef ui fill:#7C3AED,stroke:#5B21B6,color:#fff
-    classDef content fill:#0D9488,stroke:#0F766E,color:#fff
-    classDef bg fill:#D97706,stroke:#B45309,color:#fff
-    classDef ai fill:#2563EB,stroke:#1D4ED8,color:#fff
-    classDef store fill:#374151,stroke:#1F2937,color:#fff
-
-    class UI ui
-    class CS content
-    class BG bg
-    class AI ai
-    class ST store
-```
-
-### Key Architectural Decisions
-
-- **Offscreen Document + Web Worker**: The WebLLM engine runs in a dedicated Web Worker inside Chrome's `offscreen` document, keeping WebGPU inference off the UI thread entirely and preventing extension page freezes.
-- **Background service-worker as router**: All LLM requests from the content scripts are routed through the background service worker, which manages offscreen document lifecycle, model selection, and exponential-backoff retries.
-- **Mozilla Readability for content extraction**: A shared `content-extractor.js` module uses `@mozilla/readability` with a CSS-selector fallback to reliably locate the main article body, independent of page structure.
-- **System prompt library**: Three prompt families (`textClarity`, `focusStructure`, `wordPattern`) each with five intensity levels (1–5) provide 15 distinct rewrite personalities delivered from `prompts.js` without duplicating logic in the content layer.
-- **`chrome.storage.sync` for settings**: All user preferences are synced across devices at the storage layer; no settings server is required.
-
----
-
-## Use Cases
-
-```mermaid
-graph TD
     UI["Browser UI<br/>Popup · Options · Onboarding"]
     CS["Content Scripts<br/>Simplify · Chunk · Focus · TTS · Bionic · Glossary"]
     BG["Background Service Worker<br/>Message Router · Prompt Library · Shortcuts"]
@@ -143,6 +101,83 @@ graph TD
     class BG bg
     class AI ai
     class ST store
+
+```
+
+### Key Architectural Decisions
+
+- **Offscreen Document + Web Worker**: The WebLLM engine runs in a dedicated Web Worker inside Chrome's `offscreen` document, keeping WebGPU inference off the UI thread entirely and preventing extension page freezes.
+- **Background service-worker as router**: All LLM requests from the content scripts are routed through the background service worker, which manages offscreen document lifecycle, model selection, and exponential-backoff retries.
+- **Mozilla Readability for content extraction**: A shared `content-extractor.js` module uses `@mozilla/readability` with a CSS-selector fallback to reliably locate the main article body, independent of page structure.
+- **System prompt library**: Three prompt families (`textClarity`, `focusStructure`, `wordPattern`) each with five intensity levels (1–5) provide 15 distinct rewrite personalities delivered from `prompts.js` without duplicating logic in the content layer.
+- **`chrome.storage.sync` for settings**: All user preferences are synced across devices at the storage layer; no settings server is required.
+
+---
+
+## Use Cases
+
+```mermaid
+flowchart LR
+    U1(["Dyslexia Reader"])
+    U2(["ADHD Reader"])
+    U3(["Low Vision Reader"])
+    U4(["General Reader"])
+
+    subgraph LANG["AI Language"]
+        A["Text Simplification<br/>5 Levels · 3 Modes"]
+    end
+
+    subgraph READ["Reading Experience"]
+        B["Smart Chunking"]
+        C["Focus Mode"]
+    end
+
+    subgraph VISION["Visual Accessibility"]
+        D["Bionic Reading"]
+        E["Colour Themes and Font"]
+        F["Typography Controls"]
+    end
+
+    subgraph AUDIO["Audio and Comprehension"]
+        G["Text-to-Speech"]
+        H["Glossary Lookup"]
+    end
+
+    subgraph PERSONAL["Personalisation"]
+        I["Accessibility Profiles<br/>Onboarding · Shortcuts"]
+    end
+
+    U1 --> A
+    U1 --> D
+    U1 --> E
+    U1 --> F
+    U1 --> I
+    U2 --> A
+    U2 --> B
+    U2 --> C
+    U2 --> I
+    U3 --> E
+    U3 --> F
+    U3 --> G
+    U3 --> I
+    U4 --> A
+    U4 --> B
+    U4 --> G
+    U4 --> H
+
+    style U1 fill:#7C3AED,stroke:#5B21B6,color:#fff
+    style U2 fill:#0D9488,stroke:#0F766E,color:#fff
+    style U3 fill:#DC2626,stroke:#B91C1C,color:#fff
+    style U4 fill:#2563EB,stroke:#1D4ED8,color:#fff
+    style A fill:#EEF2FF,stroke:#6366F1,color:#1e1b4b
+    style B fill:#ECFDF5,stroke:#10B981,color:#065f46
+    style C fill:#ECFDF5,stroke:#10B981,color:#065f46
+    style D fill:#FDF4FF,stroke:#A855F7,color:#581c87
+    style E fill:#FDF4FF,stroke:#A855F7,color:#581c87
+    style F fill:#FDF4FF,stroke:#A855F7,color:#581c87
+    style G fill:#FFF7ED,stroke:#F97316,color:#7c2d12
+    style H fill:#FFF7ED,stroke:#F97316,color:#7c2d12
+    style I fill:#FEF9C3,stroke:#EAB308,color:#713f12
 ```
 
 ---
