@@ -22,6 +22,10 @@
 </div>
 
 ---
+### Reading Experience
+
+![Webpage with Elu active — article extracted, chunked, and styled](docs/images/wireframe-webpage.jpeg)
+---
 
 > **AMD Slingshot 2026 Submission** — Theme: *AI for Social Good*
 > Category: Assistive tools for vision, speech, reading, and neurodiverse learners.
