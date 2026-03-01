@@ -3,14 +3,26 @@
 <div align="center">
   <img src="public/images/icon128.png" alt="Elu Logo" width="128" height="128" />
   <p><em>Making the web accessible for every mind.</em></p>
+
+  <a href="https://amdslingshot.in/">
+    <img src="https://img.shields.io/badge/AMD%20Slingshot-2026%20Submission-ED1C24?style=for-the-badge&logo=amd&logoColor=white" alt="AMD Slingshot 2026" />
+  </a>
+  &nbsp;
+  <img src="https://img.shields.io/badge/Theme-AI%20in%20Education%20%26%20Skilling-0078D4?style=for-the-badge" alt="Theme" />
+  &nbsp;
+  <img src="https://img.shields.io/badge/AI%20Runtime-AMD%20Radeon%20WebGPU-ED1C24?style=for-the-badge&logo=amd&logoColor=white" alt="AMD WebGPU" />
 </div>
 
 Elu (short for **Elucidate**) is a Chrome extension that transforms web content for readers with dyslexia, ADHD, or other cognitive processing differences. It applies on-device AI, bionic reading, smart content chunking, focus isolation, and visual customization — entirely within the browser, with no data leaving the device.
+
+Built for the **[AMD Slingshot 2026](https://amdslingshot.in/)** national startup idea challenge under the *AI in Education & Skilling* and *Generative AI for Everyone* themes. Every inference in Elu is powered by WebGPU — running natively on **AMD Radeon GPUs** — making powerful AI accessible directly in the browser without a cloud backend.
 
 ---
 
 ## Table of Contents
 
+- [AMD Hardware & Ecosystem](#amd-hardware--ecosystem)
+- [Use Cases](#use-cases)
 - [Features](#features)
 - [Architecture](#architecture)
 - [Project Structure](#project-structure)
@@ -25,6 +37,144 @@ Elu (short for **Elucidate**) is a Chrome extension that transforms web content 
 - [Privacy](#privacy)
 - [Contributing](#contributing)
 - [License](#license)
+
+---
+
+## AMD Hardware & Ecosystem
+
+Elu is built from the ground up to exploit AMD's hardware and open software ecosystem at every layer of the stack.
+
+### AMD Radeon GPU — WebGPU Inference (Active)
+
+The AI inference engine inside Elu runs via **WebGPU**, the modern GPU compute API exposed natively by Chrome. AMD Radeon GPUs (RX 6000 and RX 7000 series) provide full WebGPU support, making them the primary target hardware for Elu's on-device LLM.
+
+| What runs on AMD Radeon | Details |
+|---|---|
+| On-device LLM inference | Qwen2.5-0.5B-Instruct compiled to WebGPU shaders via MLC-LLM |
+| Shader compilation | First-run JIT compilation of quantized weights to RDNA shader code |
+| VRAM usage | ~400 MB in a dedicated Web Worker; no GPU memory shared with the page |
+| Fallback | If no discrete GPU, Chrome falls back to the integrated AMD RDNA iGPU (e.g., Ryzen 7000/8000 series APUs) |
+
+> **Try it:** Open `chrome://gpu/` on a machine with an AMD Radeon GPU. You will see `WebGPU: Hardware accelerated`. Elu's model will compile and run entirely on that AMD GPU — no installation, no driver changes, no cloud.
+
+### AMD Ryzen AI — NPU Acceleration (Roadmap)
+
+AMD **Ryzen AI 300** series (Strix Point, Krackan Point) ships the **XDNA 2 NPU** — a dedicated neural processing unit rated at up to 50 TOPS. This is purpose-built for running compact LLMs locally at near-zero power cost.
+
+| Roadmap item | Description |
+|---|---|
+| Native NPU runtime | Port inference from WebGPU to Ryzen AI SDK / ONNX Runtime with the DirectML NPU EP, targeting the XDNA NPU for sub-100ms per-chunk simplification |
+| Background simplification | NPU's low power budget allows pre-simplifying articles in the background without impacting battery life |
+| Offline dictionary | NPU can power real-time glossary definitions and bionic pre-processing without touching the GPU |
+| Windows AI Studio | Integrate with AMD's Windows AI Studio toolchain for one-click model deployment on Ryzen AI hardware |
+
+### AMD ROCm — Model Optimization (Toolchain)
+
+**ROCm** (Radeon Open Compute platform) is AMD's open-source GPU compute stack used in the upstream toolchain that produces the quantized model weights Elu loads.
+
+| Toolchain step | AMD ROCm role |
+|---|---|
+| Model quantization | MLC-LLM uses ROCm-based TVM compilation to quantize Qwen2.5-0.5B to 4-bit (q4f16_1) format for WebGPU deployment |
+| Fine-tuning | ROCm + PyTorch can be used to fine-tune Qwen on accessibility-specific corpora (plain-language datasets, dyslexia corpora) before quantization |
+| Benchmarking | ROCm profiling tools (ROCProf) enable per-kernel latency analysis for the WebGPU shader kernels Elu runs |
+
+### Alignment with AMD Slingshot Innovation Themes
+
+| AMD Slingshot Theme | How Elu addresses it |
+|---|---|
+| 🎓 AI in Education & Skilling | Removes reading barriers for students with dyslexia, ADHD, or low literacy — directly enabling learning on any website |
+| 🌍 Generative AI for Everyone | On-device inference with no API key, no subscription, no data upload — every user gets the same AI regardless of connectivity or income |
+| ♿ AI for Social Good | ~15–20% of the world's population has a reading difference. Elu gives them equal access to the web's information |
+| 💻 AI in Consumer Experiences | Seamlessly integrated into the browser; users do not need to know anything about AI models to benefit |
+| 🔋 Sustainable AI & Green Tech | Running on AMD's efficient Radeon iGPU / Ryzen AI NPU instead of cloud datacenters reduces per-inference energy by orders of magnitude |
+
+---
+
+## Use Cases
+
+```mermaid
+graph TB
+    subgraph Actors
+        U(["👤 Reader"])
+        A(["🛠️ Admin/IT"])
+    end
+
+    subgraph UC_Core ["Core AI Reading Features"]
+        UC1(["Simplify article text"])
+        UC2(["Choose optimization mode"])
+        UC3(["Choose simplification level"])
+        UC4(["Undo simplification"])
+        UC2 --> UC1
+        UC3 --> UC1
+    end
+
+    subgraph UC_Access ["Accessibility & Visual"]
+        UC5(["Enable Bionic Reading"])
+        UC6(["Toggle OpenDyslexic font"])
+        UC7(["Choose color theme (13)"])
+        UC8(["Adjust line / letter / word spacing"])
+        UC9(["Apply reading profile"])
+        UC9 --> UC6
+        UC9 --> UC7
+        UC9 --> UC8
+    end
+
+    subgraph UC_TTS ["Text-to-Speech"]
+        UC10(["Read article aloud"])
+        UC11(["Pause / resume"])
+        UC12(["Change reading speed"])
+        UC13(["Change voice"])
+        UC11 --> UC10
+        UC12 --> UC10
+        UC13 --> UC10
+    end
+
+    subgraph UC_Chunk ["Smart Chunking"]
+        UC14(["Enter chunk mode"])
+        UC15(["Navigate between chunks"])
+        UC16(["Bookmark a chunk"])
+        UC17(["Resume previous session"])
+        UC15 --> UC14
+        UC16 --> UC14
+        UC17 --> UC14
+    end
+
+    subgraph UC_Focus ["Focus Mode"]
+        UC18(["Activate focus mode"])
+        UC19(["Configure dim level"])
+        UC20(["Play ambient sound"])
+        UC21(["Start Pomodoro timer"])
+        UC22(["Hide comments & sidebars"])
+        UC19 --> UC18
+        UC20 --> UC18
+        UC21 --> UC18
+        UC22 --> UC18
+    end
+
+    subgraph UC_Glossary ["Inline Glossary"]
+        UC23(["Double-click word for definition"])
+        UC24(["View AI definition tooltip"])
+        UC24 --> UC23
+    end
+
+    subgraph UC_Admin ["Extension Management"]
+        UC25(["Select AI model"])
+        UC26(["View AI loading status"])
+        UC27(["Retry model download"])
+    end
+
+    U --> UC1
+    U --> UC5
+    U --> UC10
+    U --> UC14
+    U --> UC18
+    U --> UC23
+    U --> UC9
+    A --> UC25
+    A --> UC26
+    A --> UC27
+    UC4 --> UC1
+```
 
 ---
 
@@ -126,55 +276,114 @@ Additional typography controls:
 
 ## Architecture
 
-Elu follows the standard Chrome Extension Manifest V3 architecture, composed of five execution contexts:
+### Component Architecture
 
+```mermaid
+flowchart TB
+    subgraph Browser["🌐 Chrome Browser"]
+        direction TB
+
+        subgraph UI["Extension UI Layer"]
+            Popup["🖥️ Popup\n(src/popup/)\n─────────────\nFeature controls\nTTS playback UI\nAI status badge\nSimplification level"]
+            Options["⚙️ Options Page\n(src/options/)\n─────────────\nOnboarding wizard\nModel selection\nProfile presets"]
+        end
+
+        subgraph Content["📄 Content Script (src/content/)"]
+            direction LR
+            Extractor["🔍 content-extractor.js\nReadability → CSS → Heuristic\nArticle-only text extraction"]
+            Simplify["🤖 AI Simplification\nChunking · LLM call\nDOM replacement · Undo"]
+            Bionic["👁️ Bionic Reading\nTreeWalker · Bold 1st half"]
+            TTS["🔊 Text-to-Speech\nWeb Speech API\nParagraph-level playback"]
+            Chunk["📦 Smart Chunking\n150-word segments\nProgress persistence"]
+            Focus["🎯 Focus Mode\nOverlay · Animations\nAmbient sound · Pomodoro"]
+            Glossary["📖 Inline Glossary\nDouble-click · Shadow DOM\nLLM definition"]
+            Extractor --> Simplify
+            Extractor --> TTS
+            Extractor --> Bionic
+            Extractor --> Chunk
+        end
+
+        subgraph BG["⚙️ Background Service Worker (src/background/)"]
+            Router["Message Router"]
+            Prompts["systemPrompts\n3 modes × 5 levels"]
+            Offscreen["Offscreen Lifecycle\nCreate · Check · Route"]
+            Commands["Keyboard Commands\nAlt+S · Alt+F · Alt+R"]
+            Router --- Prompts
+            Router --- Offscreen
+            Router --- Commands
+        end
+
+        subgraph Off["🧠 Offscreen Document (src/offscreen/)"]
+            Queue["Serial Inference Queue\nOne request at a time"]
+            Engine["WebLLM Engine Manager\nInit · Retry · Destroy"]
+            Worker["🔧 Web Worker\nwebllm-worker.js"]
+            GPU["⚡ AMD Radeon WebGPU\nQwen2.5-0.5B-Instruct\nq4f16_1 · ~400MB"]
+            Queue --> Engine
+            Engine --> Worker
+            Worker --> GPU
+        end
+
+        subgraph Storage["💾 Chrome Storage"]
+            Sync["storage.sync\nSettings · Focus config\nReading progress"]
+        end
+    end
+
+    Popup -- "chrome.tabs.sendMessage" --> Content
+    Options -- "chrome.storage.sync" --> Storage
+    Content -- "chrome.runtime.sendMessage\nllmInfer · getSystemPrompts" --> BG
+    BG -- "chrome.runtime.sendMessage\ntarget: offscreen" --> Queue
+    Queue -- "result" --> BG
+    BG -- "result" --> Content
+    BG -- "modelProgress broadcast" --> Popup
+    Content -- "read/write" --> Storage
+
+    style GPU fill:#ED1C24,color:#fff,stroke:#c00
+    style Worker fill:#ED1C24,color:#fff,stroke:#c00
+    style Extractor fill:#0078D4,color:#fff,stroke:#005a9e
 ```
-┌──────────────────────────────────────────────────────────────────┐
-│                         Chrome Browser                           │
-│                                                                  │
-│  ┌─────────────────┐   ┌──────────────────┐                     │
-│  │  Popup UI        │   │  Options Page    │                     │
-│  │  (src/popup/)    │   │  (src/options/)  │                     │
-│  └────────┬─────────┘   └──────────────────┘                     │
-│           │ chrome.tabs.sendMessage                               │
-│  ┌────────▼──────────────────────────────────┐                   │
-│  │  Content Script (src/content/index.js)    │                   │
-│  │  Injected into every web page             │                   │
-│  │  - AI simplification (delegates to bg)    │                   │
-│  │  - Smart chunking                         │                   │
-│  │  - Focus mode                             │                   │
-│  │  - Bionic reading                         │                   │
-│  │  - TTS                                    │                   │
-│  │  - Glossary                               │                   │
-│  │  - Visual customization                   │                   │
-│  └────────┬──────────────────────────────────┘                   │
-│           │ chrome.runtime.sendMessage                            │
-│  ┌────────▼──────────────────────────────────┐                   │
-│  │  Background Service Worker                │                   │
-│  │  (src/background/index.js)                │                   │
-│  │  - Keyboard command routing               │                   │
-│  │  - System prompt delivery                 │                   │
-│  │  - Install-time onboarding                │                   │
-│  │  - Offscreen document lifecycle           │                   │
-│  │  - LLM request routing                    │                   │
-│  └────────┬──────────────────────────────────┘                   │
-│           │ chrome.runtime.sendMessage({ target: 'offscreen' })  │
-│  ┌────────▼──────────────────────────────────┐                   │
-│  │  Offscreen Document (src/offscreen/)      │                   │
-│  │  - WebLLM engine manager                  │                   │
-│  │  - Serial inference queue                 │  ┌─────────────┐ │
-│  │  - Model download progress broadcast      ├──▶ Web Worker   │ │
-│  │                                           │  │ (WebGPU /    │ │
-│  │  Qwen2.5-0.5B-Instruct-q4f16_1-MLC        │  │  WebAssembly)│ │
-│  └───────────────────────────────────────────┘  └─────────────┘ │
-└──────────────────────────────────────────────────────────────────┘
+
+### Inference Data Flow
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant Popup as 🖥️ Popup
+    participant Content as 📄 Content Script
+    participant Extractor as 🔍 content-extractor.js
+    participant BG as ⚙️ Background SW
+    participant Offscreen as 🧠 Offscreen Doc
+    participant GPU as ⚡ AMD Radeon WebGPU
+
+    User->>Popup: Click "Simplify Text" (or Alt+S)
+    Popup->>Content: chrome.tabs.sendMessage { action: 'simplify' }
+
+    Content->>Extractor: extractArticleParagraphs()
+    Note over Extractor: Readability.js parses document clone<br/>Returns article elements only<br/>(no nav / footer / ads)
+    Extractor-->>Content: { container, elements[] }
+
+    Content->>BG: getSystemPrompts
+    BG-->>Content: systemPrompts[mode][level]
+
+    loop For each ~800-token chunk
+        Content->>BG: { action: 'llmInfer', systemPrompt, userPrompt }
+        BG->>Offscreen: { target: 'offscreen', action: 'llmInfer' }
+        Offscreen->>GPU: engine.chat.completions.create()<br/>temperature: 0.3 · max_tokens: 1200
+        Note over GPU: Qwen2.5-0.5B runs on RDNA shaders<br/>~2-8s per chunk depending on GPU
+        GPU-->>Offscreen: simplified text (Markdown)
+        Offscreen-->>BG: { success: true, result }
+        BG-->>Content: simplified text
+        Content->>Content: marked.parse() → replace DOM nodes
+        Content->>Popup: simplifyProgress { current, total }
+    end
+
+    Content-->>User: ✅ Page simplified in-place with undo support
 ```
 
 **Communication flow:**
 
 - The popup sends commands to the content script via `chrome.tabs.sendMessage`.
 - The content script requests system prompts from the background service worker via `chrome.runtime.sendMessage({ action: 'getSystemPrompts' })`.
-- LLM inference requests flow: **content script → background → offscreen document → Web Worker (WebGPU)**. The background service worker creates the offscreen document on demand and routes `llmInfer` messages to it.
+- LLM inference requests flow: **content script → background → offscreen document → Web Worker (WebGPU on AMD Radeon)**. The background service worker creates the offscreen document on demand and routes `llmInfer` messages to it.
 - The offscreen document broadcasts model download/compile progress to all extension pages (popup, options) via `chrome.runtime.sendMessage({ action: 'modelProgress' })`.
 - The background service worker routes keyboard shortcut commands (`Alt+S`, `Alt+F`, `Alt+R`) to the active tab's content script.
 - All persistent state (settings, reading progress, focus config) is stored in `chrome.storage.sync`.
