@@ -4,8 +4,8 @@ let tooltipContainer = null;
 let activeTooltip = null;
 let dismissTimer = null;
 
-const GLOSSARY_TIMEOUT_MS = 10000;
-const DICT_API_BASE = 'https://api.dictionaryapi.dev/api/v2/entries/en/';
+const GLOSSARY_TIMEOUT_MS = 10000;      // how long tooltip stays AFTER result shows
+const GLOSSARY_INFER_TIMEOUT_MS = 60000; // max time to wait for LLM inference
 
 export function initGlossary() {
     document.addEventListener('dblclick', handleDoubleClick);
@@ -31,12 +31,27 @@ async function handleDoubleClick(e) {
 
     showTooltip(centerX, posY, `<span class="loading">Looking up <em>${word}</em>…</span>`);
 
+    // Escalate loading message after 5s so user knows the model is working
+    const loadingTimer = setTimeout(() => {
+        updateTooltipContent(`<span class="loading">⚙️ Model is generating definition…</span>`);
+    }, 5000);
+
     try {
         const html = await getDefinition(word);
+        clearTimeout(loadingTimer);
         updateTooltipContent(html);
+        // Only start auto-dismiss once we have the actual result
+        if (activeTooltip) {
+            dismissTimer = setTimeout(removeTooltip, GLOSSARY_TIMEOUT_MS);
+        }
     } catch (err) {
+        clearTimeout(loadingTimer);
         console.error('[Elu Glossary] Error:', err);
-        updateTooltipContent(`<span class="error">Could not load definition.</span>`);
+        const msg = err.message?.includes('timed out') || err.message?.includes('timeout')
+            ? `<span class="error">Model took too long. Try again once it's ready.</span>`
+            : `<span class="error">Could not load definition: ${err.message}</span>`;
+        updateTooltipContent(msg);
+        if (activeTooltip) dismissTimer = setTimeout(removeTooltip, GLOSSARY_TIMEOUT_MS);
     }
 }
 
@@ -151,8 +166,8 @@ function showTooltip(x, y, htmlContent) {
     shadow.appendChild(tooltip);
     activeTooltip = tooltip;
 
-    // Auto-dismiss after timeout
-    dismissTimer = setTimeout(removeTooltip, GLOSSARY_TIMEOUT_MS);
+    // Auto-dismiss timer is started AFTER inference completes (in handleDoubleClick)
+    // so we do NOT set dismissTimer here.
 }
 
 function updateTooltipContent(html) {
@@ -171,59 +186,52 @@ function removeTooltip() {
     }
 }
 
+const GLOSSARY_SYSTEM_PROMPT =
+    'You are a concise dictionary. ' +
+    'Given a single word, respond with ONLY: ' +
+    'one line "<part-of-speech>: <definition>" (e.g. "noun: A small furry animal."). ' +
+    'No extra text, no repetition of the word, no markdown.';
+
 /**
- * Fetches a definition from the Free Dictionary API and returns a rich HTML
+ * Asks the LLM (via background) to define a word and returns a rich HTML
  * string ready to inject into the tooltip.
  *
  * @param {string} word
  * @returns {Promise<string>} HTML snippet
  */
 async function getDefinition(word) {
-    const response = await fetch(`${DICT_API_BASE}${encodeURIComponent(word)}`);
+    const inferP = chrome.runtime.sendMessage({
+        action: 'llmInfer',
+        systemPrompt: GLOSSARY_SYSTEM_PROMPT,
+        userPrompt: word
+    });
 
-    if (response.status === 404) {
-        return `<span class="term">${word}</span> <span class="error">— no definition found.</span>`;
+    const timeoutP = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Inference timed out')), GLOSSARY_INFER_TIMEOUT_MS)
+    );
+
+    const response = await Promise.race([inferP, timeoutP]);
+
+    if (!response?.success) {
+        throw new Error(response?.error || 'LLM inference failed');
     }
 
-    if (!response.ok) {
-        throw new Error(`Dictionary API error: ${response.status}`);
+    const raw = (response.result || '').trim();
+
+    if (!raw) {
+        return `<span class="term">${word}</span> <span class="error">— no definition returned.</span>`;
     }
 
-    const data = await response.json();
-
-    if (!Array.isArray(data) || data.length === 0) {
-        return `<span class="term">${word}</span> <span class="error">— no definition found.</span>`;
-    }
-
-    const entry    = data[0];
-    const phonetic = entry.phonetic || entry.phonetics?.find(p => p.text)?.text || '';
-
-    // Gather up to 3 definitions across all meanings
-    const definitions = [];
-    for (const meaning of entry.meanings ?? []) {
-        if (definitions.length >= 3) break;
-        const def = meaning.definitions?.[0];
-        if (!def) continue;
-        definitions.push({
-            partOfSpeech: meaning.partOfSpeech,
-            text: def.definition,
-            example: def.example || ''
-        });
-    }
-
-    let html = `<div class="header"><span class="term">${word}</span>`;
-    if (phonetic) html += `<span class="phonetic">${phonetic}</span>`;
-    html += `</div>`;
-
-    for (const d of definitions) {
+    // Parse optional "part-of-speech: definition" format
+    const match = raw.match(/^([a-z ]+):\s*(.+)$/i);
+    let html = `<div class="header"><span class="term">${word}</span></div>`;
+    if (match) {
         html += `<div class="definition-entry">`;
-        html += `<span class="part-of-speech">${d.partOfSpeech}:</span> `;
-        html += `<span class="definition-text">${d.text}</span>`;
-        if (d.example) {
-            html += `<div class="example">"${d.example}"</div>`;
-        }
+        html += `<span class="part-of-speech">${match[1]}:</span> `;
+        html += `<span class="definition-text">${match[2]}</span>`;
         html += `</div>`;
+    } else {
+        html += `<div class="definition-entry"><span class="definition-text">${raw}</span></div>`;
     }
-
     return html;
 }
