@@ -2,67 +2,70 @@ import { commonEnglishWords } from '../common/dictionary.js';
 
 let tooltipContainer = null;
 let activeTooltip = null;
+let dismissTimer = null;
 
 const GLOSSARY_TIMEOUT_MS = 10000;
+const DICT_API_BASE = 'https://api.dictionaryapi.dev/api/v2/entries/en/';
 
 export function initGlossary() {
     document.addEventListener('dblclick', handleDoubleClick);
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') removeTooltip();
+    });
 }
 
 async function handleDoubleClick(e) {
     const selection = window.getSelection();
     const word = selection.toString().trim();
-    
+
     if (!word || word.length > 40) return;
     if (/\s/.test(word)) return;
-    
+
     const lowerWord = word.toLowerCase();
     if (commonEnglishWords.has(lowerWord)) return;
-    
+
     const range = selection.getRangeAt(0);
     const rect = range.getBoundingClientRect();
-    const centerX = rect.left + (rect.width / 2) + window.scrollX;
-    
-    showTooltip(centerX, rect.bottom + window.scrollY + 10, "Loading definition...");
-    
+    const centerX = rect.left + rect.width / 2 + window.scrollX;
+    const posY    = rect.bottom + window.scrollY + 10;
+
+    showTooltip(centerX, posY, `<span class="loading">Looking up <em>${word}</em>…</span>`);
+
     try {
-        const definition = await getDefinition(word);
-        updateTooltipContent(definition);
+        const html = await getDefinition(word);
+        updateTooltipContent(html);
     } catch (err) {
-        console.error("Glossary Error:", err);
-        updateTooltipContent("Could not load definition.");
+        console.error('[Elu Glossary] Error:', err);
+        updateTooltipContent(`<span class="error">Could not load definition.</span>`);
     }
 }
 
 function createTooltipContainer() {
     if (tooltipContainer) return tooltipContainer;
-    
+
     const host = document.createElement('div');
     host.id = 'elu-glossary-host';
-    host.style.position = 'absolute';
-    host.style.left = '0';
-    host.style.top = '0';
-    host.style.zIndex = '2147483647';
-    host.style.pointerEvents = 'none';
-    
+    host.style.cssText = 'position:absolute;left:0;top:0;z-index:2147483647;pointer-events:none;';
+
     const shadow = host.attachShadow({ mode: 'open' });
-    
+
     const style = document.createElement('style');
     style.textContent = `
         .tooltip {
-            background: #333;
-            color: #fff;
-            padding: 8px 12px;
-            border-radius: 6px;
-            font-family: sans-serif;
-            font-size: 14px;
-            max-width: 300px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            background: #1e1e2e;
+            color: #cdd6f4;
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-family: system-ui, sans-serif;
+            font-size: 13px;
+            max-width: 320px;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.35);
             position: absolute;
             transform: translateX(-50%);
-            animation: fadeIn 0.2s ease;
+            animation: fadeIn 0.18s ease;
             pointer-events: auto;
-            line-height: 1.4;
+            line-height: 1.5;
+            border: 1px solid rgba(255,255,255,0.08);
         }
         .tooltip::before {
             content: '';
@@ -70,55 +73,98 @@ function createTooltipContainer() {
             top: -6px;
             left: 50%;
             margin-left: -6px;
-            border-width: 6px;
+            border-width: 0 6px 6px 6px;
             border-style: solid;
-            border-color: transparent transparent #333 transparent;
+            border-color: transparent transparent #1e1e2e transparent;
         }
         .term {
-            font-weight: bold;
-            color: #4fc3f7;
-            margin-right: 4px;
+            font-weight: 700;
+            color: #89b4fa;
+            font-size: 14px;
+        }
+        .phonetic {
+            color: #a6adc8;
+            font-size: 12px;
+            margin-left: 4px;
+        }
+        .header {
+            margin-bottom: 6px;
+        }
+        .definition-entry {
+            margin-top: 5px;
+        }
+        .part-of-speech {
+            color: #cba6f7;
+            font-style: italic;
+            font-size: 12px;
+        }
+        .definition-text {
+            color: #cdd6f4;
+        }
+        .example {
+            color: #a6adc8;
+            font-style: italic;
+            margin-top: 2px;
+            font-size: 12px;
+        }
+        .loading {
+            color: #a6adc8;
+            font-style: italic;
+        }
+        .error {
+            color: #f38ba8;
         }
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateX(-50%) translateY(5px); }
-            to { opacity: 1; transform: translateX(-50%) translateY(0); }
+            from { opacity: 0; transform: translateX(-50%) translateY(4px); }
+            to   { opacity: 1; transform: translateX(-50%) translateY(0); }
         }
     `;
-    
+
     shadow.appendChild(style);
     document.body.appendChild(host);
-    
+
     tooltipContainer = shadow;
-    
-    document.addEventListener('mousedown', (e) => {
-        if (activeTooltip && !host.contains(e.target)) {
-            removeTooltip();
-        }
+
+    document.addEventListener('mousedown', (ev) => {
+        if (activeTooltip && !host.contains(ev.target)) removeTooltip();
     });
 
     return shadow;
 }
 
-function showTooltip(x, y, content) {
+function showTooltip(x, y, htmlContent) {
     const shadow = createTooltipContainer();
     removeTooltip();
-    
+
     const tooltip = document.createElement('div');
     tooltip.className = 'tooltip';
-    tooltip.style.left = `${x}px`;
-    tooltip.style.top = `${y}px`;
-    tooltip.textContent = content;
-    
+
+    // Clamp x so the tooltip never overflows the viewport edges.
+    const HALF_WIDTH = 160; // approximate half of max-width (320px)
+    const maxX = document.documentElement.scrollWidth - HALF_WIDTH;
+    const clampedX = Math.max(HALF_WIDTH, Math.min(x, maxX));
+
+    tooltip.style.left = `${clampedX}px`;
+    tooltip.style.top  = `${y}px`;
+    tooltip.innerHTML  = htmlContent;
+
     shadow.appendChild(tooltip);
     activeTooltip = tooltip;
+
+    // Auto-dismiss after timeout
+    dismissTimer = setTimeout(removeTooltip, GLOSSARY_TIMEOUT_MS);
 }
 
-function updateTooltipContent(text) {
+function updateTooltipContent(html) {
     if (!activeTooltip) return;
-    activeTooltip.innerHTML = text;
+    activeTooltip.innerHTML = html;
 }
 
 function removeTooltip() {
+    if (dismissTimer) {
+        clearTimeout(dismissTimer);
+        dismissTimer = null;
+    }
     if (activeTooltip) {
         activeTooltip.remove();
         activeTooltip = null;
@@ -126,62 +172,58 @@ function removeTooltip() {
 }
 
 /**
- * Sends a message to the background with retry logic for service worker restarts.
+ * Fetches a definition from the Free Dictionary API and returns a rich HTML
+ * string ready to inject into the tooltip.
+ *
+ * @param {string} word
+ * @returns {Promise<string>} HTML snippet
  */
-async function sendMessageWithRetry(message, maxAttempts = 3) {
-    const delays = [500, 1000, 2000];
-    for (let attempt = 0; attempt < maxAttempts; attempt++) {
-        try {
-            const response = await chrome.runtime.sendMessage(message);
-            if (chrome.runtime.lastError) {
-                throw new Error(chrome.runtime.lastError.message);
-            }
-            return response;
-        } catch (err) {
-            const isDisconnect = /receiving end does not exist|disconnected/i.test(err.message);
-            if (!isDisconnect || attempt === maxAttempts - 1) throw err;
-            console.warn(`[Elu Glossary] Service worker disconnected (attempt ${attempt + 1}), retrying…`);
-            await new Promise(r => setTimeout(r, delays[Math.min(attempt, delays.length - 1)]));
-        }
-    }
-}
-
 async function getDefinition(word) {
-    const GLOSSARY_SYSTEM_PROMPT =
-        'You are a concise dictionary assistant. ' +
-        'Define the word simply in one short sentence. ' +
-        'Do not repeat the word definition prefix.';
+    const response = await fetch(`${DICT_API_BASE}${encodeURIComponent(word)}`);
 
-    try {
-        const inferenceP = sendMessageWithRetry({
-            action: 'llmInfer',
-            systemPrompt: GLOSSARY_SYSTEM_PROMPT,
-            userPrompt: `Define "${word}"`
-        });
-
-        const timeoutP = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('timeout')), GLOSSARY_TIMEOUT_MS)
-        );
-
-        const response = await Promise.race([inferenceP, timeoutP]);
-
-        if (!response?.success) {
-            throw new Error(response?.error || 'LLM inference failed');
-        }
-
-        const result = response.result || '';
-
-        // Validate glossary output: should be a short sentence, not gibberish
-        if (result.length > 300 || result.split('\n').length > 3) {
-            return `<span class="term">${word}</span>: Definition unavailable (unexpected response).`;
-        }
-
-        return `<span class="term">${word}</span>: ${result}`;
-    } catch (e) {
-        console.error('[Elu] Glossary inference error:', e);
-        if (e.message === 'timeout') {
-            return 'AI is busy. Try again in a moment.';
-        }
-        return 'Definition failed.';
+    if (response.status === 404) {
+        return `<span class="term">${word}</span> <span class="error">— no definition found.</span>`;
     }
+
+    if (!response.ok) {
+        throw new Error(`Dictionary API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (!Array.isArray(data) || data.length === 0) {
+        return `<span class="term">${word}</span> <span class="error">— no definition found.</span>`;
+    }
+
+    const entry    = data[0];
+    const phonetic = entry.phonetic || entry.phonetics?.find(p => p.text)?.text || '';
+
+    // Gather up to 3 definitions across all meanings
+    const definitions = [];
+    for (const meaning of entry.meanings ?? []) {
+        if (definitions.length >= 3) break;
+        const def = meaning.definitions?.[0];
+        if (!def) continue;
+        definitions.push({
+            partOfSpeech: meaning.partOfSpeech,
+            text: def.definition,
+            example: def.example || ''
+        });
+    }
+
+    let html = `<div class="header"><span class="term">${word}</span>`;
+    if (phonetic) html += `<span class="phonetic">${phonetic}</span>`;
+    html += `</div>`;
+
+    for (const d of definitions) {
+        html += `<div class="definition-entry">`;
+        html += `<span class="part-of-speech">${d.partOfSpeech}:</span> `;
+        html += `<span class="definition-text">${d.text}</span>`;
+        if (d.example) {
+            html += `<div class="example">"${d.example}"</div>`;
+        }
+        html += `</div>`;
+    }
+
+    return html;
 }
