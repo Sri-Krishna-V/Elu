@@ -179,28 +179,36 @@ function createFocusOverlay(dimLevel) {
                 position: fixed;
                 top: 20px;
                 right: 20px;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                color: white;
-                border: none;
-                padding: 10px 20px;
-                border-radius: 25px;
+                background: #2b2b2b;
+                color: #f5efe6;
+                border: 2.5px solid #2b2b2b;
+                padding: 10px 18px;
+                border-radius: 10px;
                 cursor: pointer;
-                font-family: 'Segoe UI', sans-serif;
-                font-size: 14px;
-                font-weight: 600;
+                font-family: 'JetBrains Mono', 'IBM Plex Mono', 'Courier New', monospace;
+                font-size: 11px;
+                font-weight: 700;
+                letter-spacing: 0.8px;
+                text-transform: uppercase;
                 pointer-events: auto;
                 z-index: 10001;
-                box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
-                transition: all 0.3s ease;
+                box-shadow: 3px 3px 0 #a8c3bc;
+                transition: all 0.15s ease;
             }
             
             .elu-focus-exit-btn:hover {
-                transform: translateY(-2px);
-                box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+                background: #4a4a4a;
+                transform: translate(-1px, -1px);
+                box-shadow: 4px 4px 0 #a8c3bc;
+            }
+
+            .elu-focus-exit-btn:active {
+                transform: translate(1px, 1px);
+                box-shadow: 2px 2px 0 #a8c3bc;
             }
         </style>
         <div id="elu-focus-spotlight"></div>
-        <button class="elu-focus-exit-btn">Exit Focus Mode ✕</button>
+        <button class="elu-focus-exit-btn">Exit Focus ✕</button>
     `;
 
     document.body.appendChild(overlay);
@@ -568,47 +576,90 @@ function formatTime(seconds) {
 }
 
 /**
- * Show a temporary notification
+ * Show a temporary notification styled to match the Elu retro pastel theme
  * @param {string} message
  * @param {string} icon
  */
 function showNotification(message, icon) {
-    const notification = document.createElement('div');
-    notification.style.cssText = `
-        position: fixed;
-        top: 20px;
-        left: 50%;
-        transform: translateX(-50%);
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        padding: 12px 24px;
-        border-radius: 25px;
-        font-family: 'Segoe UI', sans-serif;
-        font-size: 14px;
-        font-weight: 500;
-        z-index: 10002;
-        box-shadow: 0 10px 40px rgba(102, 126, 234, 0.4);
-        animation: elu-slide-in 0.5s ease;
-    `;
-    notification.innerHTML = `${icon} ${message}`;
+    // Remove any existing notification immediately
+    const existing = document.getElementById('elu-notification');
+    if (existing) existing.remove();
 
-    // Add animation keyframes
-    const style = document.createElement('style');
-    style.textContent = `
-        @keyframes elu-slide-in {
-            from { opacity: 0; transform: translateX(-50%) translateY(-20px); }
-            to { opacity: 1; transform: translateX(-50%) translateY(0); }
-        }
+    // Inject styles once
+    if (!document.getElementById('elu-notification-styles')) {
+        const style = document.createElement('style');
+        style.id = 'elu-notification-styles';
+        style.textContent = `
+            @keyframes elu-notif-in {
+                from { opacity: 0; transform: translateX(-50%) translateY(-14px) scale(0.97); }
+                to   { opacity: 1; transform: translateX(-50%) translateY(0)   scale(1); }
+            }
+            @keyframes elu-notif-out {
+                from { opacity: 1; transform: translateX(-50%) translateY(0)    scale(1); }
+                to   { opacity: 0; transform: translateX(-50%) translateY(-14px) scale(0.97); }
+            }
+            #elu-notification {
+                position: fixed;
+                top: 24px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: #f5efe6;
+                color: #2b2b2b;
+                padding: 11px 22px 11px 18px;
+                border-radius: 12px;
+                border: 2.5px solid #2b2b2b;
+                font-family: 'JetBrains Mono', 'IBM Plex Mono', 'Courier New', monospace;
+                font-size: 11px;
+                font-weight: 700;
+                letter-spacing: 0.6px;
+                text-transform: uppercase;
+                z-index: 2147483647;
+                box-shadow: 4px 4px 0 #2b2b2b;
+                white-space: nowrap;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                animation: elu-notif-in 0.25s ease forwards;
+                pointer-events: none;
+            }
+            #elu-notification .elu-notif-accent {
+                position: absolute;
+                left: 0;
+                top: 0;
+                bottom: 0;
+                width: 5px;
+                background: #a8c3bc;
+                border-radius: 9px 0 0 9px;
+            }
+            #elu-notification .elu-notif-icon {
+                font-size: 14px;
+                line-height: 1;
+                margin-left: 4px;
+            }
+            #elu-notification .elu-notif-text {
+                font-size: 11px;
+                line-height: 1.3;
+            }
+            #elu-notification.elu-notif-leaving {
+                animation: elu-notif-out 0.25s ease forwards;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    const notification = document.createElement('div');
+    notification.id = 'elu-notification';
+    notification.innerHTML = `
+        <div class="elu-notif-accent"></div>
+        <span class="elu-notif-icon">${icon}</span>
+        <span class="elu-notif-text">${message}</span>
     `;
-    document.head.appendChild(style);
     document.body.appendChild(notification);
 
     setTimeout(() => {
-        notification.style.opacity = '0';
-        notification.style.transform = 'translateX(-50%) translateY(-20px)';
-        notification.style.transition = 'all 0.3s ease';
-        setTimeout(() => notification.remove(), 300);
-    }, 3000);
+        notification.classList.add('elu-notif-leaving');
+        setTimeout(() => notification.remove(), 260);
+    }, 2800);
 }
 
 /**

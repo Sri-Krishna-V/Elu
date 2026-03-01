@@ -536,6 +536,25 @@ document.addEventListener('DOMContentLoaded', function () {
         mainContent.style.display = 'block';
     });
 
+    // AI Model selector in settings
+    const aiModelSelectSettings = document.getElementById('aiModelSelectSettings');
+    if (aiModelSelectSettings) {
+        chrome.storage.sync.get(['selectedModel'], (result) => {
+            let model = result.selectedModel;
+            if (!model || model === 'Llama-3.2-1B-Instruct-q4f16_1-MLC') {
+                model = 'Qwen2.5-0.5B-Instruct-q4f16_1-MLC';
+            }
+            aiModelSelectSettings.value = model;
+        });
+
+        aiModelSelectSettings.addEventListener('change', (e) => {
+            const newModel = e.target.value;
+            chrome.storage.sync.set({ selectedModel: newModel }, () => {
+                chrome.runtime.sendMessage({ action: 'modelChanged', model: newModel });
+            });
+        });
+    }
+
     // Handle optimize for dropdown changes and help icon
     document.getElementById('optimizeSelector').addEventListener('change', function (e) {
         chrome.storage.sync.set({ optimizeFor: e.target.value });

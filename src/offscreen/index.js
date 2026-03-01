@@ -39,23 +39,6 @@ const INIT_BACKOFF_BASE_MS = 2000;
 const INFERENCE_TIMEOUT_MS = 180000; // 180 seconds (3 minutes) for slower hardware
 
 /**
- * Get the selected model from storage, with fallback to default
- */
-async function getSelectedModel() {
-    return new Promise((resolve) => {
-        chrome.storage.sync.get(['selectedModel'], (result) => {
-            let model = result.selectedModel;
-            // Migrate from old Llama model or use default
-            if (!model || model === 'Llama-3.2-1B-Instruct-q4f16_1-MLC') {
-                model = DEFAULT_MODEL;
-                chrome.storage.sync.set({ selectedModel: model });
-            }
-            resolve(model);
-        });
-    });
-}
-
-/**
  * Properly destroy the existing engine to free VRAM
  */
 async function destroyEngine() {
@@ -85,7 +68,7 @@ async function destroyEngine() {
  * @param {string} forceModel - Optional model ID to force load (for reloading)
  */
 async function initEngine(forceModel = null) {
-    const modelToLoad = forceModel || await getSelectedModel();
+    const modelToLoad = forceModel || DEFAULT_MODEL;
     
     // If we already have the right model loaded, return it
     if (engine && engineStatus === 'ready' && currentModel === modelToLoad) {
@@ -162,6 +145,7 @@ async function initEngine(forceModel = null) {
         engineErrorReason = 'init_failed';
         currentModel = null;
         initPromise = null;
+        engine = null;
         chrome.runtime.sendMessage({
             action: 'modelProgress',
             progress: { progress: 0, text: 'Model download failed. Click Retry in the popup.' }
@@ -236,7 +220,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
     switch (message.action) {
         case 'initEngine': {
-            initEngine()
+            initEngine(message.model || null)
                 .then(() => sendResponse({ success: true }))
                 .catch((err) => sendResponse({ success: false, error: err.message }));
             return true; // async
@@ -286,8 +270,9 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 });
 
 // ─── Auto-initialise on document load ─────────────────────────────────────
-// Start warming up the engine as soon as the offscreen document is created
-// so the first real inference request is faster.
-initEngine().catch((err) => {
+// Start warming up the engine as soon as the offscreen document is created.
+// The background script will call initEngine(model) with the correct model;
+// this fallback uses the default model in case of direct startup.
+initEngine(DEFAULT_MODEL).catch((err) => {
     console.error('[Elu offscreen] Engine init failed:', err);
 });

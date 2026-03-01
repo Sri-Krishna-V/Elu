@@ -398,6 +398,23 @@
                 </div>
             </div>
 
+            <!-- ── AI Model Card ── -->
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-icon"><i class="fas fa-microchip"></i></span>
+                    <span class="card-title">AI Model</span>
+                </div>
+
+                <div class="slider-container" style="padding-bottom: 4px;">
+                    <label for="aiModelSelectSettings" style="margin-bottom: 8px; display: block;">Choose AI model:</label>
+                    <select id="aiModelSelectSettings" style="width: 100%; padding: 8px 10px; border: 1.5px solid var(--border-color, #ccc); border-radius: 8px; font-family: inherit; font-size: 12px; background: var(--bg-secondary, #fff); color: var(--text-primary, #000); cursor: pointer;">
+                        <option value="Qwen2.5-0.5B-Instruct-q4f16_1-MLC">Qwen 2.5 0.5B — Fastest, Very Low VRAM</option>
+                        <option value="SmolLM2-1.7B-Instruct-q4f16_1-MLC">SmolLM2 1.7B — Higher Quality, Moderate VRAM</option>
+                    </select>
+                    <p style="font-size: 10px; color: var(--text-secondary, #666); margin-top: 8px; line-height: 1.5;">Changing models reloads the AI engine. This may take a moment.</p>
+                </div>
+            </div>
+
             <!-- ── Reset Button ── -->
             <button id="resetDefaults" class="btn btn-secondary btn-full">
                 <i class="fas fa-undo"></i>

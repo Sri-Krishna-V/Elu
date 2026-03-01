@@ -52,6 +52,22 @@ async function sendToOffscreen(payload) {
 }
 
 /**
+ * Read the selected model from storage (with migration from old Llama model).
+ */
+async function getSelectedModel() {
+    return new Promise((resolve) => {
+        chrome.storage.sync.get(['selectedModel'], (result) => {
+            let model = result.selectedModel;
+            if (!model || model === 'Llama-3.2-1B-Instruct-q4f16_1-MLC') {
+                model = 'Qwen2.5-0.5B-Instruct-q4f16_1-MLC';
+                chrome.storage.sync.set({ selectedModel: model });
+            }
+            resolve(model);
+        });
+    });
+}
+
+/**
  * Ensures the offscreen document exists AND the engine is initialized.
  * Handles the case where Chrome silently killed the offscreen document.
  */
@@ -59,7 +75,8 @@ async function ensureEngineReady() {
     await ensureOffscreenDocument();
     const status = await sendToOffscreen({ action: 'checkStatus' });
     if (status?.status !== 'ready') {
-        const initResult = await sendToOffscreen({ action: 'initEngine' });
+        const model = await getSelectedModel();
+        const initResult = await sendToOffscreen({ action: 'initEngine', model });
         if (!initResult?.success) {
             throw new Error(initResult?.error || 'Engine initialization failed');
         }
@@ -150,7 +167,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         (async () => {
             try {
                 await ensureOffscreenDocument();
-                const result = await sendToOffscreen({ action: 'initEngine' });
+                const model = await getSelectedModel();
+                const result = await sendToOffscreen({ action: 'initEngine', model });
                 sendResponse(result ?? { success: false, error: 'No response from offscreen' });
             } catch (err) {
                 sendResponse({ success: false, error: err.message });
